@@ -6,7 +6,7 @@ const { Telegraf, Markup, session } = require("telegraf");
 // const { message } = require("telegraf/filters");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const homepage_url = "https://78de-106-184-152-126.ngrok-free.app";
+const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
 
 // const bot = new TelegramBot(token, {polling: true});
 const bot = new Telegraf(token);
