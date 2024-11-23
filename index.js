@@ -1,19 +1,18 @@
 require("dotenv").config();
-
-// const TelegramBot = require('node-telegram-bot-api');
-// const axios = require("axios");
+const express = require("express");
+const bodyParser = require("body-parser");
 const { Telegraf, Markup, session } = require("telegraf");
-// const { message } = require("telegraf/filters");
+const { createHmac } = require("crypto");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
 
-// const bot = new TelegramBot(token, {polling: true});
+const app = express();
 const bot = new Telegraf(token);
 
-// const initialKeyboard = Markup.keyboard([
-//   ['Yes', 'No'],
-// ])
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
 const dummyKeyboard = { keyboard: [[{ text: "Yes" }, { text: "No" }]] };
 
 const initialKeyboard = {
@@ -31,8 +30,8 @@ const initialKeyboard = {
       { text: "Branches", web_app: { url: "https://www.mavistutorial.com/branches" } }
     ],
   ],
-  resize_keyboard: true, // Adjusts keyboard size to fit buttons
-  one_time_keyboard: false, // Hides keyboard after a button is pressed
+  resize_keyboard: true,
+  one_time_keyboard: false,
 }
 
 const stage1_yes_keyboard = {
@@ -49,8 +48,8 @@ const stage1_yes_keyboard = {
       { text: "Branches", web_app: { url: "https://www.mavistutorial.com/branches" } }
     ],
   ],
-  resize_keyboard: true, // Adjusts keyboard size to fit buttons
-  one_time_keyboard: false, // Hides keyboard after a button is pressed
+  resize_keyboard: true,
+  one_time_keyboard: false,
 }
 
 const stage1_no_keyboard = {
@@ -67,8 +66,8 @@ const stage1_no_keyboard = {
       { text: "Branches", web_app: { url: "https://www.mavistutorial.com/branches" } }
     ],
   ],
-  resize_keyboard: true, // Adjusts keyboard size to fit buttons
-  one_time_keyboard: false, // Hides keyboard after a button is pressed
+  resize_keyboard: true,
+  one_time_keyboard: false,
 }
 
 const questionKeyboard = {
@@ -83,8 +82,8 @@ const questionKeyboard = {
       { text: "Question 3", callback_data: "question_3" },
     ],
   ],
-  resize_keyboard: true, // Adjusts keyboard size to fit buttons
-  one_time_keyboard: true, // Hides keyboard after a button is pressed
+  resize_keyboard: true,
+  one_time_keyboard: true,
 }
 
 bot.use(session());
@@ -93,13 +92,11 @@ bot.use((ctx, next) => {
   return next();
 });
 
-// Start command to send the first keyboard
 bot.start((ctx) => {
   ctx.reply('Welcome to Mavis Tutorial Centre!\n\nDo you have Mavis Online Account?\n\n(If the Yes/No buttons are not shown, try switching between a keyboard and buttons by tapping on the icon on the right of the message box)', { reply_markup: initialKeyboard });
   ctx.session.stage = 1;
 });
 
-// First handler for "Button 1"
 bot.on('text', (ctx, next) => {
   let stage = ctx.session.stage
   let text = ctx.message.text
@@ -124,13 +121,6 @@ bot.on('text', (ctx, next) => {
       ctx.replyWithMarkdown(`Sorry, I did not understand that. Please say *Hello* to restart the conversation.`)
   }  
   console.log(ctx.session.stage)
-  // if (ctx.session.stage == 1 && ctx.message.text === 'Yes') {
-  //   ctx.reply('You clicked Button 1 after /start!');
-  //   ctx.session.stage = 2;
-  // } else if (ctx.session.stage == 1 && ctx.message.text === 'Yes')
-  // {
-  //     ctx.reply('Please use /start before pressing Button 1.');
-  // }
   next();
 });
 
@@ -157,13 +147,74 @@ bot.action("question_3", (ctx) => {
   ctx.reply("Question 3");
 });
 
-// Fallback handler for any other text
-// bot.on('text', (ctx) => {
-//   ctx.reply("I didn't understand that command.");
-// });
-
 bot.launch();
 
-// Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
+
+// Helper functions for validation
+function HMAC_SHA256(key, data) {
+  return createHmac("sha256", key).update(data);
+}
+
+function getCheckString(data) {
+  const items = [];
+
+  for (const [key, value] of data.entries()) {
+    if (key !== "hash") items.push([key, value]);
+  }
+
+  return items
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+}
+
+// Validate initData endpoint
+app.post("/validate-init", (req, res) => {
+  const data = new URLSearchParams(req.body.initData);
+  console.log(`/validate-init: ${JSON.stringify(data)}`)
+  const secretKey = HMAC_SHA256("WebAppData", process.env.BOT_TOKEN).digest();
+  const checkString = getCheckString(data);
+  const hash = HMAC_SHA256(secretKey, checkString).digest("hex");
+
+  if (hash === data.get("hash")) {
+    return res.json(Object.fromEntries(data.entries()));
+  }
+
+  return res.status(401).json({ error: "Invalid initData" });
+});
+
+// Handle sending data via Telegraf
+app.post("/send-data", (req, res) => {
+  const { query_id, message } = req.body;
+
+  if (!query_id || !message) {
+    return res.status(400).json({ error: "Missing query_id or message" });
+  }
+
+  bot.telegram
+    .answerWebAppQuery(query_id, {
+      id: "0",
+      type: "article",
+      title: "Message Sent",
+      input_message_content: {
+        message_text: message,
+      },
+    })
+    .then(() => res.json({ success: true }))
+    .catch((err) => {
+      console.error("Error sending message:", err);
+      res.status(500).json({ success: false });
+    });
+});
+
+app.get("/get", (req, res) => {
+  console.log('get')
+})
+
+// Start the server
+const PORT = 5000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+});
