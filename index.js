@@ -209,8 +209,10 @@ app.post("/send-data", (req, res) => {
     });
 });
 
-app.get("/get", (req, res) => {
-  console.log('get')
+app.post("/submit", (req, res) => {
+  const { userInitData } = req.body
+  console.log(`Chat ID: ${userInitData?.user?.id}`)
+  res.json({ success: true })
 })
 
 // Start the server
