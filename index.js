@@ -7,9 +7,11 @@ const { createHmac } = require("crypto");
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
 
+const cors = require('cors');
 const app = express();
 const bot = new Telegraf(token);
 
+app.use(cors({ origin: '*', methods: 'GET,POST,OPTIONS,PUT,DELETE' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
