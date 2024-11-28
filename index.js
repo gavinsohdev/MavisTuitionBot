@@ -188,7 +188,6 @@ bot.action("question_3", (ctx) => {
 bot.launch({
   webhook: {
     domain: 'https://54.210.159.48', // Replace with your domain or IP address
-    port: 443,                      // Use the port where NGINX serves HTTPS
     hookPath: `/bot${process.env.TELEGRAM_BOT_TOKEN}` // Ensure webhook path matches Telegram settings
   }
 });
