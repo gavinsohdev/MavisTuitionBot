@@ -16,8 +16,17 @@ const bot = new Telegraf(token);
 app.use(express.json());
 
 app.post("*", async (req, res) => {
-  console.log(req.body);
-  res.send("Hello post");
+  try {
+    const chatId = req.body.chatId; // Make sure the request body includes the chat ID
+    const message = req.body.message || "Default message"; // Optionally pass a message from the request
+    
+    // Use bot.telegram.sendMessage to send a message to the chat
+    await bot.telegram.sendMessage(chatId, message);
+    res.status(200).send("Message sent successfully");
+  } catch (error) {
+    console.error("Error sending message:", error);
+    res.status(500).send("Failed to send message");
+  }
 });
 app.get("*", async (req, res) => {
   res.send("Hello get");
