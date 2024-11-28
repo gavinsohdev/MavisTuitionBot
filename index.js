@@ -184,7 +184,12 @@ bot.action("question_3", (ctx) => {
 });
 
 // bot.launch();
-bot.startWebhook();
+// bot.startWebhook();
+bot.launch({
+  webhook: {
+    domain: 'https://54.210.159.48'
+  }
+})
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
