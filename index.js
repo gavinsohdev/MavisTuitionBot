@@ -183,14 +183,8 @@ bot.action("question_3", (ctx) => {
   ctx.reply("Question 3");
 });
 
-// bot.launch();
+bot.launch();
 // bot.startWebhook();
-bot.launch({
-  webhook: {
-    domain: 'https://54.210.159.48', // Replace with your domain or IP address
-    hookPath: `/bot${process.env.TELEGRAM_BOT_TOKEN}` // Ensure webhook path matches Telegram settings
-  }
-});
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
