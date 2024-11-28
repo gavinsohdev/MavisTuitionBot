@@ -183,7 +183,8 @@ bot.action("question_3", (ctx) => {
   ctx.reply("Question 3");
 });
 
-bot.launch();
+// bot.launch();
+bot.startWebhook();
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
