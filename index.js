@@ -16,6 +16,7 @@ const bot = new Telegraf(token);
 app.use(express.json());
 
 app.post("*", async (req, res) => {
+  console.log(`req: ${req.body}`)
   try {
     const chatId = req.body.chatId; // Make sure the request body includes the chat ID
     const message = req.body.message || "Default message"; // Optionally pass a message from the request
