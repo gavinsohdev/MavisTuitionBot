@@ -16,11 +16,17 @@ const bot = new Telegraf(token);
 app.use(express.json());
 
 app.post("*", async (req, res) => {
-  console.log(`req: ${JSON.stringify(req.body)}`)
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); // Allowed methods
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept'); // Allowed headers
+
+  console.log(`req: ${JSON.stringify(req.body)}`);
+  
   try {
-    const chatId = req.body.chatId; // Make sure the request body includes the chat ID
-    const message = req.body.message || "Default message"; // Optionally pass a message from the request
-    
+    const chatId = req.body.chatId; // Ensure the request body includes the chat ID
+    const message = req.body.message || "Default message"; // Use a default message if none is provided
+
     // Use bot.telegram.sendMessage to send a message to the chat
     await bot.telegram.sendMessage(chatId, message);
     res.status(200).send("Message sent successfully");
@@ -29,6 +35,7 @@ app.post("*", async (req, res) => {
     res.status(500).send("Failed to send message");
   }
 });
+
 app.get("*", async (req, res) => {
   // Access query parameters from the request
   const { chatId, message } = req.query;
