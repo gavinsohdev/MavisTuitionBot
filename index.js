@@ -30,7 +30,30 @@ app.post("*", async (req, res) => {
   }
 });
 app.get("*", async (req, res) => {
-  res.send("Hello get");
+  // Access query parameters from the request
+  const { chatId, message } = req.query;
+
+  // Check if chatId and message are provided in the query
+  if (!chatId || !message) {
+    return res.status(400).send("chatId and message are required");
+  }
+
+  try {
+    // Example logic to process the chatId and message
+    console.log(`Received chatId: ${chatId}, message: ${message}`);
+    
+    // Send a success response
+    res.status(200).send({
+      success: true,
+      chatId,
+      message,
+    });
+
+  } catch (error) {
+    // Handle any errors that occur during processing
+    console.error('Error processing request:', error);
+    res.status(500).send('Internal server error');
+  }
 });
 
 const dummyKeyboard = { keyboard: [[{ text: "Yes" }, { text: "No" }]] };
