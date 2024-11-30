@@ -1,28 +1,17 @@
 require("dotenv").config();
 const express = require("express");
-// const bodyParser = require("body-parser");
 const { Telegraf, Markup, session } = require("telegraf");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
 
-// const cors = require('cors');
 const app = express();
 const bot = new Telegraf(token);
 
-// app.use(cors({ origin: '*', methods: 'GET,POST,OPTIONS,PUT,DELETE' }));
-// app.use(bodyParser.urlencoded({ extended: true }));
-// app.use(bodyParser.json());
 app.use(express.json());
 
-app.post("*", async (req, res) => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); // Allowed methods
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept'); // Allowed headers
-
+app.post("/test", async (req, res) => {
   console.log(`req: ${JSON.stringify(req.body)}`);
-  
   try {
     const chatId = req.body.chatId; // Ensure the request body includes the chat ID
     const message = req.body.message || "Default message"; // Use a default message if none is provided
