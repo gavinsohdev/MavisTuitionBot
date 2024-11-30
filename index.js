@@ -37,18 +37,17 @@ app.get("*", async (req, res) => {
   try {
     // Example logic to process the chatId and message
     console.log(`Received chatId: ${chatId}, message: ${message}`);
-    
+
     // Send a success response
     res.status(200).send({
       success: true,
       chatId,
       message,
     });
-
   } catch (error) {
     // Handle any errors that occur during processing
-    console.error('Error processing request:', error);
-    res.status(500).send('Internal server error');
+    console.error("Error processing request:", error);
+    res.status(500).send("Internal server error");
   }
 });
 
@@ -141,10 +140,22 @@ bot.use((ctx, next) => {
 });
 
 bot.start((ctx) => {
-  ctx.reply(
-    "Welcome to Mavis Tutorial Centre!\n\nDo you have Mavis Online Account?\n\n(If the Yes/No buttons are not shown, try switching between a keyboard and buttons by tapping on the icon on the right of the message box)",
-    { reply_markup: initialKeyboard }
-  );
+  const args = ctx.message.text.split(" ");
+  if (args.length > 1) {
+    const parameter = args[1];
+    if (parameter === "promo") {
+      ctx.reply("Welcome! Here's a special promotion just for you.");
+    } else if (parameter === "support") {
+      ctx.reply("How can I assist you today?");
+    } else {
+      ctx.reply("Thanks for joining! Let's get started.");
+    }
+  } else {
+    ctx.reply(
+      "Welcome to Mavis Tutorial Centre!\n\nDo you have Mavis Online Account?\n\n(If the Yes/No buttons are not shown, try switching between a keyboard and buttons by tapping on the icon on the right of the message box)",
+      { reply_markup: initialKeyboard }
+    );
+  }
   ctx.session.stage = 1;
 });
 
