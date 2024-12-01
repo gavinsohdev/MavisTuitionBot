@@ -31,7 +31,7 @@ app.post("/test-upload", async (req, res) => {
   const data = req.body;
   const dataUpdated = await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
   console.log(dataUpdated)
-  return dataUpdated;
+  res.status(200);
 });
 
 app.post("/checkMembership", async (req, res) => {
