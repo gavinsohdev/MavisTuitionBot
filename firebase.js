@@ -44,7 +44,7 @@ const initializeFirebaseApp = () => {
 const uploadProcessedData = async (data) => {
   const dataToUpload = data || { key1: "test", key2: 123, key3: new Date() };
   try {
-    const document = doc(firestoreDb, "users", data?.id || "some test id");
+    const document = doc(firestoreDb, "users", "some test id");
     let dataUpdated = await setDoc(document, dataToUpload);
     return dataUpdated;
   } catch (error) {
