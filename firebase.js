@@ -62,7 +62,7 @@ const getUserData = async (id) => {
     console.log(typeof id);
     const collectionRef = collection(firestoreDb, "users");
     const finalData = [];
-    const q = query(collectionRef, where("id", "=", id));
+    const q = query(collectionRef, where("id", "==", id));
 
     const docSnap = await getDocs(q);
 
