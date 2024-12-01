@@ -69,6 +69,7 @@ const getUserData = async (id) => {
     docSnap.forEach((doc) => {
       finalData.push(doc.data());
     });
+    return finalData;
   } catch (error) {
     console.log(error);
   }
