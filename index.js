@@ -36,6 +36,7 @@ app.post("/test-upload", async (req, res) => {
 app.post("/test-get", async (req, res) => {
   const id = req.body.id;
   const dataResponse = await getUserData(id);
+  console.log(dataResponse)
   res.status(200).send({ ...dataResponse, success: true });
 });
 
