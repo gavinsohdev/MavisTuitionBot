@@ -37,15 +37,14 @@ app.post("/test-upload", async (req, res) => {
     ...data,
     registeredAt: new Date().toISOString(),
   });
-  res.status(200).send({ success: true });
+  res.status(200).send({ status: true });
 });
 
 app.post("/test-get", async (req, res) => {
   const id = req.body.id;
   console.log(id);
   const dataResponse = await getUserData(id);
-  console.log(JSON.stringify(dataResponse));
-  res.status(200).send({ ...dataResponse, success: true });
+  res.status(200).send({ dataArr: dataResponse, status: true });
 });
 
 app.post("/checkMembership", async (req, res) => {
