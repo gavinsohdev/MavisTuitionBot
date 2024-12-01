@@ -46,6 +46,7 @@ const uploadProcessedData = async (data) => {
   try {
     const document = doc(firestoreDb, "users", String(data?.id || "some test id"));
     let dataUpdated = await setDoc(document, dataToUpload);
+    console.log(dataUpdated)
     return dataUpdated;
   } catch (error) {
     console.log(error);
