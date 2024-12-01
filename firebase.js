@@ -6,7 +6,7 @@ const {
   collection,
   getDocs,
   query,
-  where
+  where,
 } = require("firebase/firestore");
 
 const {
@@ -43,9 +43,13 @@ const initializeFirebaseApp = () => {
 };
 
 const uploadProcessedData = async (data) => {
-  const dataToUpload = data || { key1: "test", key2: 123, key3: new Date() };
+  const dataToUpload = data;
   try {
-    const document = doc(firestoreDb, "users", String(data?.id || "some test id"));
+    const document = doc(
+      firestoreDb,
+      "users",
+      String(data?.id || "some test id")
+    );
     let dataUpdated = await setDoc(document, dataToUpload);
     return dataUpdated;
   } catch (error) {
@@ -55,12 +59,10 @@ const uploadProcessedData = async (data) => {
 
 const getUserData = async (id) => {
   try {
+    console.log(typeof id);
     const collectionRef = collection(firestoreDb, "users");
     const finalData = [];
-    const q = query(
-        collectionRef,
-        where("id", "=",  id)
-    );
+    const q = query(collectionRef, where("id", "=", String(id)));
 
     const docSnap = await getDocs(q);
 

@@ -1,7 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const { Telegraf, Markup, session } = require("telegraf");
-const { initializeFirebaseApp, uploadProcessedData, getUserData } = require("./firebase");
+const {
+  initializeFirebaseApp,
+  uploadProcessedData,
+  getUserData,
+} = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
@@ -29,26 +33,30 @@ app.post("/test", async (req, res) => {
 
 app.post("/test-upload", async (req, res) => {
   const data = req.body;
-  const dataResponse = await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
+  const dataResponse = await uploadProcessedData({
+    ...data,
+    registeredAt: new Date().toISOString(),
+  });
   res.status(200).send({ success: true });
 });
 
 app.post("/test-get", async (req, res) => {
   const id = req.body.id;
   const dataResponse = await getUserData(id);
-  console.log(dataResponse)
+  console.log(dataResponse);
   res.status(200).send({ ...dataResponse, success: true });
 });
 
 app.post("/checkMembership", async (req, res) => {
-  const { id, first_name, last_name, username, language_code, photo_url } = req.body;
-  const userRef = db.collection('users').doc(id);
+  const { id, first_name, last_name, username, language_code, photo_url } =
+    req.body;
+  const userRef = db.collection("users").doc(id);
   const doc = await userRef.get();
   if (!doc.exists) {
     console.log(`Doc: ${doc}`);
     return true;
   } else {
-    console.log('Document data:', doc.data());
+    console.log("Document data:", doc.data());
     return false;
   }
 });
@@ -82,19 +90,16 @@ app.get("*", async (req, res) => {
 function verifyTelegramSignature(data) {
   const { hash, ...userData } = data;
   const sortedData = Object.keys(userData)
-      .sort()
-      .map((key) => `${key}=${userData[key]}`)
-      .join("\n");
+    .sort()
+    .map((key) => `${key}=${userData[key]}`)
+    .join("\n");
 
-  const secretKey = crypto
-      .createHash("sha256")
-      .update(BOT_TOKEN)
-      .digest();
+  const secretKey = crypto.createHash("sha256").update(BOT_TOKEN).digest();
 
   const calculatedHash = crypto
-      .createHmac("sha256", secretKey)
-      .update(sortedData)
-      .digest("hex");
+    .createHmac("sha256", secretKey)
+    .update(sortedData)
+    .digest("hex");
 
   return calculatedHash === hash;
 }
