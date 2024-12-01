@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { Telegraf, Markup, session } = require("telegraf");
-const { initializeFirebaseApp, uploadProcessedData } = require("./firebase");
+const { initializeFirebaseApp, uploadProcessedData, getUserData } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
@@ -29,8 +29,14 @@ app.post("/test", async (req, res) => {
 
 app.post("/test-upload", async (req, res) => {
   const data = req.body;
-  const dataUpdated = await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
+  const dataResponse = await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
   res.status(200).send({ success: true });
+});
+
+app.post("/test-get", async (req, res) => {
+  const id = req.body.id;
+  const dataResponse = await getUserData(id);
+  res.status(200).send({ ...dataResponse, success: true });
 });
 
 app.post("/checkMembership", async (req, res) => {

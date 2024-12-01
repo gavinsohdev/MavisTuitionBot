@@ -6,6 +6,7 @@ const {
   collection,
   getDocs,
   query,
+  where
 } = require("firebase/firestore");
 
 const {
@@ -52,11 +53,14 @@ const uploadProcessedData = async (data) => {
   }
 };
 
-const getTheData = async (from, to) => {
+const getUserData = async (id) => {
   try {
     const collectionRef = collection(firestoreDb, "users");
     const finalData = [];
-    const q = query(collectionRef);
+    const q = query(
+        collectionRef,
+        where("id", "=",  id)
+    );
 
     const docSnap = await getDocs(q);
 
@@ -74,5 +78,5 @@ module.exports = {
   initializeFirebaseApp,
   getFirebaseApp,
   uploadProcessedData,
-  getTheData,
+  getUserData,
 };
