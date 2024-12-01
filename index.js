@@ -29,8 +29,8 @@ app.post("/test", async (req, res) => {
 
 app.post("/test-upload", async (req, res) => {
   const data = req.body;
-  await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
-  return "Success";
+  const dataUpdated = await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
+  return dataUpdated;
 });
 
 app.post("/checkMembership", async (req, res) => {
