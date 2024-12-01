@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { Telegraf, Markup, session } = require("telegraf");
+const { initializeFirebaseApp, uploadProcessedData } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
@@ -9,6 +10,7 @@ const app = express();
 const bot = new Telegraf(token);
 
 app.use(express.json());
+initializeFirebaseApp();
 
 app.post("/test", async (req, res) => {
   console.log(`req: ${JSON.stringify(req.body)}`);
@@ -22,6 +24,25 @@ app.post("/test", async (req, res) => {
   } catch (error) {
     console.error("Error sending message:", error);
     res.status(500).send("Failed to send message");
+  }
+});
+
+app.post("/test-upload", async (req, res) => {
+  const data = req.body;
+  await uploadProcessedData({ ...data,  registeredAt: new Date().toISOString() } );
+  return "Success";
+});
+
+app.post("/checkMembership", async (req, res) => {
+  const { id, first_name, last_name, username, language_code, photo_url } = req.body;
+  const userRef = db.collection('users').doc(id);
+  const doc = await userRef.get();
+  if (!doc.exists) {
+    console.log(`Doc: ${doc}`);
+    return true;
+  } else {
+    console.log('Document data:', doc.data());
+    return false;
   }
 });
 
@@ -50,6 +71,26 @@ app.get("*", async (req, res) => {
     res.status(500).send("Internal server error");
   }
 });
+
+function verifyTelegramSignature(data) {
+  const { hash, ...userData } = data;
+  const sortedData = Object.keys(userData)
+      .sort()
+      .map((key) => `${key}=${userData[key]}`)
+      .join("\n");
+
+  const secretKey = crypto
+      .createHash("sha256")
+      .update(BOT_TOKEN)
+      .digest();
+
+  const calculatedHash = crypto
+      .createHmac("sha256", secretKey)
+      .update(sortedData)
+      .digest("hex");
+
+  return calculatedHash === hash;
+}
 
 const dummyKeyboard = { keyboard: [[{ text: "Yes" }, { text: "No" }]] };
 
