@@ -44,6 +44,7 @@ app.post("/test-get", async (req, res) => {
   const id = req.body.id;
   console.log(id);
   const dataResponse = await getUserData(id);
+  console.log(JSON.stringify({ dataArr: dataResponse, status: true }))
   res.status(200).send({ dataArr: dataResponse, status: true });
 });
 
