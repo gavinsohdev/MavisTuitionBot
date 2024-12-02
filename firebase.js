@@ -3,6 +3,7 @@ const {
   getFirestore,
   doc,
   setDoc,
+  getDoc,
   collection,
   getDocs,
   query,
@@ -45,11 +46,18 @@ const initializeFirebaseApp = () => {
 const uploadProcessedData = async (data) => {
   const dataToUpload = data;
   try {
-    const document = doc(
-      firestoreDb,
-      "users",
-      String(data?.id || "some test id")
-    );
+    const document = doc(firestoreDb, "users", String(data?.id));
+    let dataUpdated = await setDoc(document, dataToUpload);
+    return dataUpdated;
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const uploadProcessedDataCoin = async (data) => {
+  const dataToUpload = { coin: 100, id: String(data?.id), last_updated: new Date().toISOString() };
+  try {
+    const document = doc(firestoreDb, "user_coins", String(data?.id));
     let dataUpdated = await setDoc(document, dataToUpload);
     return dataUpdated;
   } catch (error) {
@@ -59,7 +67,6 @@ const uploadProcessedData = async (data) => {
 
 const getUserData = async (id) => {
   try {
-    console.log(typeof id);
     const collectionRef = collection(firestoreDb, "users");
     const finalData = [];
     const q = query(collectionRef, where("id", "==", id));
@@ -75,11 +82,39 @@ const getUserData = async (id) => {
   }
 };
 
+const getUserCoins = async (id) => {
+  const coinDocRef = doc(firestoreDb, "user_coins", id);
+  const docSnap = await getDoc(coinDocRef);
+  if (docSnap.exists()) {
+    return docSnap.data();
+  } else {
+    console.log("No coin data found for user:", id);
+    return null;
+  }
+};
+
+const updateUserCoins = async (id, coinAmount) => {
+  const coinDocRef = doc(firestoreDb, "user_coins", id);
+  await setDoc(
+    coinDocRef,
+    {
+      id,
+      coin: coinAmount,
+      last_updated: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+  console.log(`Coins for user ${id} updated to ${coinAmount}`);
+};
+
 const getFirebaseApp = () => app;
 
 module.exports = {
   initializeFirebaseApp,
   getFirebaseApp,
   uploadProcessedData,
+  uploadProcessedDataCoin,
   getUserData,
+  getUserCoins,
+  updateUserCoins,
 };

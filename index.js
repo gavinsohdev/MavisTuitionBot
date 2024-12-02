@@ -4,7 +4,10 @@ const { Telegraf, Markup, session } = require("telegraf");
 const {
   initializeFirebaseApp,
   uploadProcessedData,
+  uploadProcessedDataCoin,
   getUserData,
+  getUserCoins,
+  updateUserCoins,
 } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -33,19 +36,20 @@ app.post("/test", async (req, res) => {
 
 app.post("/test-upload", async (req, res) => {
   const data = req.body;
-  const dataResponse = await uploadProcessedData({
-    ...data,
-    registeredAt: new Date().toISOString(),
-  });
+  const dataResponse = await uploadProcessedData(data);
+  const dataResponseCoin = await uploadProcessedDataCoin(data);
   res.status(200).send({ status: true });
 });
 
 app.post("/test-get", async (req, res) => {
   const id = req.body.id;
-  console.log(id);
   const dataResponse = await getUserData(id);
-  console.log(JSON.stringify({ dataArr: dataResponse, status: true }))
-  res.status(200).send({ dataArr: dataResponse, status: true });
+  console.log(`${JSON.stringify(dataResponse)}`);
+  if (dataResponse.length == 1) {
+    res.status(200).send({ dataArr: dataResponse, status: true });
+  } else {
+    res.status(200).send({ status: false });
+  }
 });
 
 app.post("/checkMembership", async (req, res) => {
@@ -60,6 +64,13 @@ app.post("/checkMembership", async (req, res) => {
     console.log("Document data:", doc.data());
     return false;
   }
+});
+
+app.post("/get-coins", async (req, res) => {
+  const id = req.body.id;
+  const dataResponse = await getUserCoins(id);
+  console.log(`${JSON.stringify(dataResponse)}`);
+  res.status(200).send(dataResponse);
 });
 
 app.get("*", async (req, res) => {
