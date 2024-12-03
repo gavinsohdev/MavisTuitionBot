@@ -3,9 +3,10 @@ const express = require("express");
 const { Telegraf, Markup, session } = require("telegraf");
 const {
   initializeFirebaseApp,
-  uploadProcessedData,
+  registerUser,
+  updateUser,
   uploadProcessedDataCoin,
-  getUserData,
+  getUser,
   getUserCoins,
   updateUserCoins,
 } = require("./firebase");
@@ -34,21 +35,33 @@ app.post("/test", async (req, res) => {
   }
 });
 
-app.post("/test-upload", async (req, res) => {
+app.post("/register-user", async (req, res) => {
   const data = req.body;
-  const dataResponse = await uploadProcessedData(data);
+  const dataResponse = await registerUser(data);
   const dataResponseCoin = await uploadProcessedDataCoin(data);
   res.status(200).send({ status: true });
 });
 
-app.post("/test-get", async (req, res) => {
-  const id = req.body.id;
-  const dataResponse = await getUserData(id);
-  console.log(`${JSON.stringify(dataResponse)}`);
-  if (dataResponse.length == 1) {
-    res.status(200).send({ dataArr: dataResponse, status: true });
-  } else {
-    res.status(200).send({ status: false });
+app.post("/update-user", async (req, res) => {
+  const data = req.body;
+  const dataResponse = await updateUser(data);
+  res.status(200).send({ status: true });
+});
+
+app.post("/get-user", async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.status(400).send({ status: false, message: "ID is required." });
+    }
+    const user = await getUser(id);
+    if (user) {
+      return res.status(200).send({ status: true, dataObj: user });
+    } 
+    res.status(200).send({ status: false, message: "No user found with the id" });
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
@@ -69,6 +82,13 @@ app.post("/checkMembership", async (req, res) => {
 app.post("/get-coins", async (req, res) => {
   const id = req.body.id;
   const dataResponse = await getUserCoins(id);
+  console.log(`${JSON.stringify(dataResponse)}`);
+  res.status(200).send(dataResponse);
+});
+
+app.post("/update-coins", async (req, res) => {
+  const { id, coinAmount } = req.body;
+  const dataResponse = await updateUserCoins(id, coinAmount);
   console.log(`${JSON.stringify(dataResponse)}`);
   res.status(200).send(dataResponse);
 });

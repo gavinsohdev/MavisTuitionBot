@@ -4,6 +4,7 @@ const {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   collection,
   getDocs,
   query,
@@ -43,19 +44,53 @@ const initializeFirebaseApp = () => {
   }
 };
 
-const uploadProcessedData = async (data) => {
-  const dataToUpload = data;
+const registerUser = async (data) => {
   try {
-    const document = doc(firestoreDb, "users", String(data?.id));
-    let dataUpdated = await setDoc(document, dataToUpload);
+    const document = doc(firestoreDb, "users", data?.id);
+    let dataUpdated = await setDoc(document, data);
     return dataUpdated;
   } catch (error) {
     console.log(error);
   }
 };
 
+const updateUser = async (data) => {
+  const documentRef = doc(firestoreDb, "users", data?.id);
+
+  try {
+    // Fetch the current document data
+    const currentDoc = await getDoc(documentRef);
+
+    if (currentDoc.exists()) {
+      const currentData = currentDoc.data();
+      const updatedFields = {};
+
+      // Check for changes in fields
+      for (const key in data) {
+        if (data[key] !== currentData[key]) {
+          updatedFields[key] = String(data[key]);
+        }
+      }
+
+      // If there are changes, update the document
+      if (Object.keys(updatedFields).length > 0) {
+        await updateDoc(documentRef, updatedFields);
+        console.log("Document updated with fields:", updatedFields);
+        return updatedFields;
+      } else {
+        console.log("No changes detected.");
+        return null;
+      }
+    } else {
+      console.error("Document does not exist. Consider registering the user.");
+    }
+  } catch (error) {
+    console.error("Error updating user data:", error);
+  }
+};
+
 const uploadProcessedDataCoin = async (data) => {
-  const dataToUpload = { coin: 100, id: String(data?.id), last_updated: new Date().toISOString() };
+  const dataToUpload = { coin: 0, id: String(data?.id), last_updated: new Date().toISOString() };
   try {
     const document = doc(firestoreDb, "user_coins", String(data?.id));
     let dataUpdated = await setDoc(document, dataToUpload);
@@ -65,20 +100,41 @@ const uploadProcessedDataCoin = async (data) => {
   }
 };
 
-const getUserData = async (id) => {
+// const getUsers = async (id) => {
+//   try {
+//     const collectionRef = collection(firestoreDb, "users");
+//     const finalData = [];
+//     const q = query(collectionRef, where("id", "==", id));
+
+//     const docSnap = await getDocs(q);
+
+//     docSnap.forEach((doc) => {
+//       finalData.push(doc.data());
+//     });
+//     return finalData;
+//   } catch (error) {
+//     console.log(error);
+//   }
+// };
+
+const getUser = async (id) => {
   try {
-    const collectionRef = collection(firestoreDb, "users");
-    const finalData = [];
-    const q = query(collectionRef, where("id", "==", id));
+    // Reference to the document based on the provided `id`
+    const userDocRef = doc(firestoreDb, "users", id);
 
-    const docSnap = await getDocs(q);
+    // Fetch the document
+    const docSnap = await getDoc(userDocRef);
 
-    docSnap.forEach((doc) => {
-      finalData.push(doc.data());
-    });
-    return finalData;
+    // Check if the document exists
+    if (docSnap.exists()) {
+      return docSnap.data(); // Return the data if the document exists
+    }
+
+    // Return null if the document does not exist
+    return null;
   } catch (error) {
     console.log(error);
+    throw new Error("Error fetching user data.");
   }
 };
 
@@ -112,9 +168,10 @@ const getFirebaseApp = () => app;
 module.exports = {
   initializeFirebaseApp,
   getFirebaseApp,
-  uploadProcessedData,
+  registerUser,
+  updateUser,
   uploadProcessedDataCoin,
-  getUserData,
+  getUser,
   getUserCoins,
   updateUserCoins,
 };
