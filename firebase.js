@@ -54,8 +54,8 @@ const registerUser = async (data) => {
   }
 };
 
-const updateUser = async (data) => {
-  const documentRef = doc(firestoreDb, "users", data?.id);
+const updateUser = async ({ data, id }) => {
+  const documentRef = doc(firestoreDb, "users", id);
 
   try {
     // Fetch the current document data
@@ -68,7 +68,7 @@ const updateUser = async (data) => {
       // Check for changes in fields
       for (const key in data) {
         if (data[key] !== currentData[key]) {
-          updatedFields[key] = String(data[key]);
+          updatedFields[key] = data[key];
         }
       }
 
@@ -89,7 +89,7 @@ const updateUser = async (data) => {
   }
 };
 
-const uploadProcessedDataCoin = async (data) => {
+const registerUserCoin = async (data) => {
   const dataToUpload = { coin: 0, id: String(data?.id), last_updated: new Date().toISOString() };
   try {
     const document = doc(firestoreDb, "user_coins", String(data?.id));
@@ -170,7 +170,7 @@ module.exports = {
   getFirebaseApp,
   registerUser,
   updateUser,
-  uploadProcessedDataCoin,
+  registerUserCoin,
   getUser,
   getUserCoins,
   updateUserCoins,

@@ -5,7 +5,7 @@ const {
   initializeFirebaseApp,
   registerUser,
   updateUser,
-  uploadProcessedDataCoin,
+  registerUserCoin,
   getUser,
   getUserCoins,
   updateUserCoins,
@@ -37,15 +37,25 @@ app.post("/test", async (req, res) => {
 
 app.post("/register-user", async (req, res) => {
   const data = req.body;
-  const dataResponse = await registerUser(data);
-  const dataResponseCoin = await uploadProcessedDataCoin(data);
-  res.status(200).send({ status: true });
+  try {
+    await registerUser(data);
+    await registerUserCoin(data);
+    res.status(200).send({ status: true });  
+  } catch (error) {
+    console.error("Error registering user data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
 });
 
 app.post("/update-user", async (req, res) => {
   const data = req.body;
-  const dataResponse = await updateUser(data);
-  res.status(200).send({ status: true });
+  try {
+    await updateUser(data);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error updating user data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
 });
 
 app.post("/get-user", async (req, res) => {
@@ -65,32 +75,38 @@ app.post("/get-user", async (req, res) => {
   }
 });
 
-app.post("/checkMembership", async (req, res) => {
-  const { id, first_name, last_name, username, language_code, photo_url } =
-    req.body;
-  const userRef = db.collection("users").doc(id);
-  const doc = await userRef.get();
-  if (!doc.exists) {
-    console.log(`Doc: ${doc}`);
-    return true;
-  } else {
-    console.log("Document data:", doc.data());
-    return false;
-  }
-});
+// app.post("/checkMembership", async (req, res) => {
+//   const { id, first_name, last_name, username, language_code, photo_url } =
+//     req.body;
+//   const userRef = db.collection("users").doc(id);
+//   const doc = await userRef.get();
+//   if (!doc.exists) {
+//     console.log(`Doc: ${doc}`);
+//     return true;
+//   } else {
+//     console.log("Document data:", doc.data());
+//     return false;
+//   }
+// });
 
 app.post("/get-coins", async (req, res) => {
-  const id = req.body.id;
-  const dataResponse = await getUserCoins(id);
-  console.log(`${JSON.stringify(dataResponse)}`);
-  res.status(200).send(dataResponse);
+  const { id } = req.body;
+  try {
+    const dataResponse = await getUserCoins(id);
+    res.status(200).send(dataResponse);
+  } catch (error) {
+    res.status(500).send({ error: "Internal Server Error." });
+  }
 });
 
 app.post("/update-coins", async (req, res) => {
   const { id, coinAmount } = req.body;
-  const dataResponse = await updateUserCoins(id, coinAmount);
-  console.log(`${JSON.stringify(dataResponse)}`);
-  res.status(200).send(dataResponse);
+  try {
+    const dataResponse = await updateUserCoins(id, coinAmount);
+    res.status(200).send({ status: true, coin: coinAmount });    
+  } catch (error) {
+    res.status(500).send({ status: false, error: "Internal Server Error." });
+  } 
 });
 
 app.get("*", async (req, res) => {
