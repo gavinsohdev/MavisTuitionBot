@@ -9,6 +9,13 @@ const {
   getUser,
   getUserCoins,
   updateUserCoins,
+  uploadReward,
+  getAllRewards,
+  updateReward,
+  deleteReward,
+  addToCart,
+  placeOrder,
+  executeOrder
 } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -35,11 +42,24 @@ app.post("/test", async (req, res) => {
   }
 });
 
+// app.post("/verify-signature", async (req, res) => {
+//   try {
+//     const data = req.body;
+//     console.log('data: ' + JSON.stringify(data))
+//     res.status(200).send("Message sent successfully");
+//   } catch (error) {
+//     console.error("Error sending message:", error);
+//     res.status(500).send("Failed to send message");
+//   }
+// });
+
 app.post("/register-user", async (req, res) => {
   const data = req.body;
   try {
     await registerUser(data);
-    await registerUserCoin(data);
+    if (data.role == 'Student') {
+      await registerUserCoin(data);
+    }
     res.status(200).send({ status: true });  
   } catch (error) {
     console.error("Error registering user data:", error);
@@ -107,6 +127,81 @@ app.post("/update-coins", async (req, res) => {
   } catch (error) {
     res.status(500).send({ status: false, error: "Internal Server Error." });
   } 
+});
+
+app.post("/get-all-rewards", async (req, res) => {
+  try {
+    const dataResponse = await getAllRewards();
+    res.status(200).send({ status: true, dataObj: dataResponse });
+  } catch (error) {
+    res.status(500).send({ error: "Internal Server Error." });
+  }
+});
+
+app.post("/upload-reward", async (req, res) => {
+  const { payload: data } = req.body;
+  try {
+    const dataResponse = await uploadReward(data);
+    res.status(200).send({ status: true });
+  } catch (error) {
+    console.error("Error uploading reward:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
+});
+
+app.post("/update-reward", async (req, res) => {
+  const data = req.body;
+  try {
+    const dataResponse = await updateReward(data?.payload);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error updating reward data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
+});
+
+app.post("/delete-reward", async (req, res) => {
+  const { id } = req.body;
+  try {
+    const dataResponse = await deleteReward(id);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error deleting reward data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
+});
+
+app.post("/add-to-cart", async (req, res) => {
+  const { id = '', reward = {} } = req.body;
+  try {
+    const dataResponse = await addToCart(id, reward);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error adding to cart:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
+});
+
+app.post("/place-order", async (req, res) => {
+  const data = req.body;
+  try {
+    const dataResponse = await placeOrder(data?.payload);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error updating reward data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
+});
+
+app.post("/execute-order", async (req, res) => {
+  const data = req.body;
+  try {
+    const dataResponse = await executeOrder(data?.payload);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error updating reward data:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
 });
 
 app.get("*", async (req, res) => {
