@@ -18,7 +18,8 @@ const {
   getAllCart,
   placeOrder,
   executeOrder,
-  getAllOrders
+  getAllOrders,
+  getAllOrdersWithUsers
 } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -235,6 +236,16 @@ app.post("/get-all-orders", async (req, res) => {
   const { id } = req.body;
   try {
     const dataResponse = await getAllOrders(id);
+    res.status(200).send({ status: true, dataObj: dataResponse });
+  } catch (error) {
+    res.status(500).send({ error: "Internal Server Error." });
+  }
+});
+
+app.get("/get-all-orders-with-users", async (req, res) => {
+  try {
+    const dataResponse = await getAllOrdersWithUsers();
+    console.log('/get-all-orders-with-users: ' + JSON.stringify(dataResponse))
     res.status(200).send({ status: true, dataObj: dataResponse });
   } catch (error) {
     res.status(500).send({ error: "Internal Server Error." });

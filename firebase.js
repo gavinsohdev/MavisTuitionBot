@@ -405,6 +405,52 @@ const placeOrder = async (userId) => {
   }
 };
 
+const getAllOrdersWithUsers = async () => {
+  try {
+    const ordersCollectionRef = collection(firestoreDb, "orders"); // Collection for orders
+    const ordersQuerySnapshot = await getDocs(ordersCollectionRef);
+
+    const ordersWithUsers = [];
+
+    for (const orderDoc of ordersQuerySnapshot.docs) {
+      const orderData = orderDoc.data();
+      const userId = orderData.user_id;
+
+      if (userId) {
+        // Correct usage of `doc`
+        const userDocRef = doc(firestoreDb, "users", userId); // Reference to user document
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          // Combine the order data with the user data
+          ordersWithUsers.push({
+            order: orderData,
+            user: userData,
+          });
+        } else {
+          console.error(`User not found for userId: ${userId}`);
+          ordersWithUsers.push({
+            order: orderData,
+            user: null, // Indicate user details were not found
+          });
+        }
+      } else {
+        console.error("Order does not have a userId.");
+        ordersWithUsers.push({
+          order: orderData,
+          user: null,
+        });
+      }
+    }
+
+    return ordersWithUsers; // Return the combined data
+  } catch (error) {
+    console.error("Error retrieving orders with user details:", error);
+    throw error; // Re-throw the error for upstream handling
+  }
+};
+
 const executeOrder = async (orderId) => {
   const db = firebase.firestore();
   const orderRef = db.collection('orders').doc(orderId);
@@ -479,5 +525,6 @@ module.exports = {
   getAllCart,
   placeOrder,
   executeOrder,
-  getAllOrders
+  getAllOrders,
+  getAllOrdersWithUsers
 };
