@@ -14,8 +14,11 @@ const {
   updateReward,
   deleteReward,
   addToCart,
+  deleteFromCart,
+  getAllCart,
   placeOrder,
-  executeOrder
+  executeOrder,
+  getAllOrders
 } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -171,6 +174,16 @@ app.post("/delete-reward", async (req, res) => {
   }
 });
 
+app.post("/get-all-cart", async (req, res) => {
+  const { id } = req.body;
+  try {
+    const dataResponse = await getAllCart(id);
+    res.status(200).send({ status: true, dataObj: dataResponse });
+  } catch (error) {
+    res.status(500).send({ error: "Internal Server Error." });
+  }
+});
+
 app.post("/add-to-cart", async (req, res) => {
   const { id = '', reward = {} } = req.body;
   try {
@@ -182,14 +195,49 @@ app.post("/add-to-cart", async (req, res) => {
   }
 });
 
+app.post("/delete-from-cart", async (req, res) => {
+  const { id = '', itemId = '' } = req.body;
+  try {
+    const dataResponse = await deleteFromCart(id, itemId);
+    res.status(200).send({ status: true });    
+  } catch (error) {
+    console.error("Error adding to cart:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });    
+  }
+});
+
 app.post("/place-order", async (req, res) => {
   const data = req.body;
   try {
-    const dataResponse = await placeOrder(data?.payload);
-    res.status(200).send({ status: true });    
+    const dataResponse = await placeOrder(data?.id);
+    console.log('/place-order dataResponse: ' + JSON.stringify(dataResponse))
+    if (dataResponse === "INSUFFICIENT_COINS") {
+      // Handle insufficient coins scenario
+      res.status(200).send({
+        status: false,
+        message: "INSUFFICIENT_COINS",
+      });
+    } else {
+      // Handle successful order placement with new coin balance
+      res.status(200).send({
+        status: true,
+        message: "ORDER SUCCESSFUL",
+        newCoinBalance: dataResponse,
+      });
+    }
   } catch (error) {
     console.error("Error updating reward data:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
+  }
+});
+
+app.post("/get-all-orders", async (req, res) => {
+  const { id } = req.body;
+  try {
+    const dataResponse = await getAllOrders(id);
+    res.status(200).send({ status: true, dataObj: dataResponse });
+  } catch (error) {
+    res.status(500).send({ error: "Internal Server Error." });
   }
 });
 

@@ -1,5 +1,6 @@
 const { initializeApp } = require("firebase/app");
 const {
+  runTransaction,
   getFirestore,
   doc,
   setDoc,
@@ -9,7 +10,7 @@ const {
   getDocs,
   deleteDoc,
   query,
-  where,
+  where
 } = require("firebase/firestore");
 
 const {
@@ -273,33 +274,135 @@ const addToCart = async (userId, reward) => {
   }
 };
 
-const placeOrder = async (userId) => {
-  const cartRef = firebase.firestore().collection('carts').doc(userId);
-  const cartDoc = await cartRef.get();
+const deleteFromCart = async (userId, itemId) => {
+  const documentRef = doc(firestoreDb, "carts", userId);
+  const cartDoc = await getDoc(documentRef);
 
-  if (!cartDoc.exists) throw new Error("Cart not found");
+  if (cartDoc.exists()) {
+    const cartData = cartDoc.data();
+    const itemIndex = cartData.items.findIndex(item => item.id === itemId);
 
-  const cartData = cartDoc.data();
+    if (itemIndex >= 0) {
+      const item = cartData.items[itemIndex];
+      
+      // Decrease quantity or remove item
+      if (item.quantity > 1) {
+        cartData.items[itemIndex].quantity -= 1;
+      } else {
+        cartData.items.splice(itemIndex, 1); // Remove the item if quantity is 1
+      }
 
-  // Fetch user's coin balance
-  const userCoinsRef = firebase.firestore().collection('user_coins').doc(userId);
-  const userCoinsDoc = await userCoinsRef.get();
-  const userCoins = userCoinsDoc.data();
+      // Recalculate total price
+      cartData.total_price = cartData.items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
 
-  if (userCoins.coin < cartData.total_price) throw new Error("Insufficient coins");
+      // Update last_updated timestamp
+      cartData.last_updated = new Date().toISOString();
 
-  // Deduct coins and create order
-  await firebase.firestore().runTransaction(async (transaction) => {
-    transaction.update(userCoinsRef, { coin: userCoins.coin - cartData.total_price });
-    transaction.set(firebase.firestore().collection('orders').doc(), {
-      user_id: userId,
-      items: cartData.items,
-      total_price: cartData.total_price,
-      status: "Pending",
-      date_ordered: new Date().toISOString()
+      // Save updated cart to Firestore
+      await setDoc(documentRef, cartData, { merge: true });
+    } else {
+      console.error("Item not found in the cart");
+    }
+  } else {
+    console.error("Cart not found for user:", userId);
+  }
+};
+
+const getAllCart = async (userId) => {
+  try {
+    const documentRef = doc(firestoreDb, "carts", userId);
+    const cartDoc = await getDoc(documentRef);
+
+    if (cartDoc.exists()) {
+      return cartDoc.data(); // Return the cart data
+    } else {
+      console.error("Cart not found for user:", userId);
+      return null; // Return null if the cart doesn't exist
+    }
+  } catch (error) {
+    console.error("Error retrieving cart:", error);
+    throw error; // Re-throw the error for upstream handling
+  }
+};
+
+const getAllOrders = async (userId) => {
+  try {
+    const ordersCollectionRef = collection(firestoreDb, "orders"); // Replace "orders" with the actual collection name
+    const q = query(ordersCollectionRef, where("user_id", "==", userId)); // Query orders for matching user_id
+
+    const querySnapshot = await getDocs(q);
+
+    const orders = [];
+
+    querySnapshot.forEach((doc) => {
+      const orderData = doc.data();
+      orders.push(orderData); // Add each order's data to the orders array
     });
-    transaction.delete(cartRef); // Clear the cart
-  });
+
+    if (orders.length > 0) {
+      return orders; // Return the array of orders with matching user_id
+    } else {
+      console.error("No orders found for user:", userId);
+      return null; // Return null if no orders are found for the user
+    }
+  } catch (error) {
+    console.error("Error retrieving orders:", error);
+    throw error; // Re-throw the error for upstream handling
+  }
+};
+
+const placeOrder = async (userId) => {
+  try {
+    const cartRef = doc(firestoreDb, "carts", userId);
+    const userCoinsRef = doc(firestoreDb, "user_coins", userId);
+    const ordersCollectionRef = collection(firestoreDb, "orders");
+
+    const result = await runTransaction(firestoreDb, async (transaction) => {
+      // Fetch cart data
+      const cartDoc = await transaction.get(cartRef);
+      if (!cartDoc.exists()) throw new Error("Cart not found");
+      const cartData = cartDoc.data();
+
+      // Fetch user's coin balance
+      const userCoinsDoc = await transaction.get(userCoinsRef);
+      if (!userCoinsDoc.exists()) throw new Error("User coins not found");
+      const userCoins = userCoinsDoc.data();
+
+      // Check if the user has sufficient coins
+      if (userCoins.coin < cartData.total_price) {
+        // Return a specific value indicating insufficient coins
+        return "INSUFFICIENT_COINS";
+      }
+
+      // Deduct coins
+      const newCoinBalance = userCoins.coin - cartData.total_price;
+      transaction.update(userCoinsRef, { coin: newCoinBalance });
+
+      // Create a new order
+      const newOrderRef = doc(ordersCollectionRef); // Automatically generates an ID
+      transaction.set(newOrderRef, {
+        user_id: userId,
+        items: cartData.items,
+        total_price: cartData.total_price,
+        status: "Pending",
+        date_ordered: new Date().toISOString(),
+      });
+
+      // Clear the user's cart
+      transaction.delete(cartRef);
+
+      return newCoinBalance; // Return the new coin balance
+    });
+
+    console.log(`${result}`);
+    return result;
+  } catch (error) {
+    console.error("Error placing order:", error);
+    throw error;
+  }
 };
 
 const executeOrder = async (orderId) => {
@@ -372,6 +475,9 @@ module.exports = {
   updateReward,
   deleteReward,
   addToCart,
+  deleteFromCart,
+  getAllCart,
   placeOrder,
-  executeOrder
+  executeOrder,
+  getAllOrders
 };
