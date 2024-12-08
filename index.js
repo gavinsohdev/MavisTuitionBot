@@ -17,7 +17,7 @@ const {
   deleteFromCart,
   getAllCart,
   placeOrder,
-  executeOrder,
+  updateOrder,
   getAllOrders,
   getAllOrdersWithUsers
 } = require("./firebase");
@@ -245,18 +245,18 @@ app.post("/get-all-orders", async (req, res) => {
 app.get("/get-all-orders-with-users", async (req, res) => {
   try {
     const dataResponse = await getAllOrdersWithUsers();
-    console.log('/get-all-orders-with-users: ' + JSON.stringify(dataResponse))
     res.status(200).send({ status: true, dataObj: dataResponse });
   } catch (error) {
     res.status(500).send({ error: "Internal Server Error." });
   }
 });
 
-app.post("/execute-order", async (req, res) => {
-  const data = req.body;
+app.post("/update-order", async (req, res) => {
+  const { orderId, adminData: { first_name, last_name } } = req.body;
+  const admin_fullname = `${first_name} ${last_name}`
   try {
-    const dataResponse = await executeOrder(data?.payload);
-    res.status(200).send({ status: true });    
+    const dataResponse = await updateOrder(orderId, admin_fullname);
+    res.status(200).send({ status: true }); 
   } catch (error) {
     console.error("Error updating reward data:", error);
     res.status(500).send({ status: false, message: "Internal server error." });    

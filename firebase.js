@@ -389,6 +389,7 @@ const placeOrder = async (userId) => {
         total_price: cartData.total_price,
         status: "Pending",
         date_ordered: new Date().toISOString(),
+        date_completed: { date: null, completed_by: null }
       });
 
       // Clear the user's cart
@@ -407,38 +408,38 @@ const placeOrder = async (userId) => {
 
 const getAllOrdersWithUsers = async () => {
   try {
-    const ordersCollectionRef = collection(firestoreDb, "orders"); // Collection for orders
+    const ordersCollectionRef = collection(firestoreDb, "orders"); // Reference to orders collection
     const ordersQuerySnapshot = await getDocs(ordersCollectionRef);
 
     const ordersWithUsers = [];
 
     for (const orderDoc of ordersQuerySnapshot.docs) {
       const orderData = orderDoc.data();
+      const orderId = orderDoc.id; // Retrieve the document ID of the order
       const userId = orderData.user_id;
 
       if (userId) {
-        // Correct usage of `doc`
         const userDocRef = doc(firestoreDb, "users", userId); // Reference to user document
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          // Combine the order data with the user data
+          // Combine the order data, document ID, and user data
           ordersWithUsers.push({
-            order: orderData,
+            order: { ...orderData, id: orderId }, // Include document ID in the order object
             user: userData,
           });
         } else {
           console.error(`User not found for userId: ${userId}`);
           ordersWithUsers.push({
-            order: orderData,
+            order: { ...orderData, id: orderId }, // Include document ID even if user is missing
             user: null, // Indicate user details were not found
           });
         }
       } else {
         console.error("Order does not have a userId.");
         ordersWithUsers.push({
-          order: orderData,
+          order: { ...orderData, id: orderId }, // Include document ID
           user: null,
         });
       }
@@ -451,20 +452,25 @@ const getAllOrdersWithUsers = async () => {
   }
 };
 
-const executeOrder = async (orderId) => {
-  const db = firebase.firestore();
-  const orderRef = db.collection('orders').doc(orderId);
+const updateOrder = async (orderId, admin_fullname) => {
+  console.log('orderId: ' + orderId);
+  const orderRef = doc(firestoreDb, "orders", orderId);
 
   try {
-    await db.runTransaction(async (transaction) => {
+    await runTransaction(firestoreDb, async (transaction) => {
       // Fetch the order document
       const orderDoc = await transaction.get(orderRef);
 
-      if (!orderDoc.exists) {
+      if (!orderDoc.exists()) {
         throw new Error("Order not found");
       }
 
       const orderData = orderDoc.data();
+
+      // Check if orderData.items is an array
+      if (!Array.isArray(orderData.items)) {
+        throw new Error("Order items is not an array");
+      }
 
       if (orderData.status !== "Pending") {
         throw new Error("Order is not in a valid state to execute");
@@ -472,12 +478,17 @@ const executeOrder = async (orderId) => {
 
       // Loop through items in the order
       for (const item of orderData.items) {
-        const rewardRef = db.collection('rewards').doc(item.reward_id);
+        // Check if item.reward_id is defined and not null
+        if (!item.id) {
+          throw new Error("Reward ID is missing for an item in the order");
+        }
+
+        const rewardRef = doc(firestoreDb, 'rewards', item.id); // Get a reference to the reward document
 
         // Fetch the reward document
         const rewardDoc = await transaction.get(rewardRef);
-        if (!rewardDoc.exists) {
-          throw new Error(`Reward with ID ${item.reward_id} not found`);
+        if (!rewardDoc.exists()) {
+          throw new Error(`Reward with ID ${item.id} not found`);
         }
 
         const rewardData = rewardDoc.data();
@@ -487,7 +498,7 @@ const executeOrder = async (orderId) => {
           throw new Error(`Insufficient quantity for reward: ${item.name}`);
         }
 
-        // Deduct the quantity
+        // Deduct the quantity from the reward document
         transaction.update(rewardRef, {
           quantity: rewardData.quantity - item.quantity,
         });
@@ -496,7 +507,10 @@ const executeOrder = async (orderId) => {
       // Update the order status to "Completed"
       transaction.update(orderRef, {
         status: "Completed",
+        date_completed: { date: new Date().toISOString(), completed_by: admin_fullname }
       });
+      
+      return true;
     });
 
     console.log("Order executed successfully!");
@@ -524,7 +538,7 @@ module.exports = {
   deleteFromCart,
   getAllCart,
   placeOrder,
-  executeOrder,
+  updateOrder,
   getAllOrders,
   getAllOrdersWithUsers
 };
