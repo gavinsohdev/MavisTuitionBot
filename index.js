@@ -211,7 +211,6 @@ app.post("/place-order", async (req, res) => {
   const data = req.body;
   try {
     const dataResponse = await placeOrder(data?.id);
-    console.log('/place-order dataResponse: ' + JSON.stringify(dataResponse))
     if (dataResponse === "INSUFFICIENT_COINS") {
       // Handle insufficient coins scenario
       res.status(200).send({
@@ -252,14 +251,93 @@ app.get("/get-all-orders-with-users", async (req, res) => {
 });
 
 app.post("/update-order", async (req, res) => {
-  const { orderId, adminData: { first_name, last_name } } = req.body;
-  const admin_fullname = `${first_name} ${last_name}`
+  const {
+    orderId,
+    adminData: { first_name, last_name },
+  } = req.body;
+
+  const admin_fullname = `${first_name} ${last_name}`;
+
   try {
     const dataResponse = await updateOrder(orderId, admin_fullname);
-    res.status(200).send({ status: true }); 
+
+    // Log the response for debugging
+    console.log("dataResponse:", JSON.stringify(dataResponse));
+
+    // Check for specific error types and respond accordingly
+    if (!dataResponse.success) {
+      switch (dataResponse.errorType) {
+        case "ORDER_NOT_FOUND":
+          res.status(404).send({
+            status: false,
+            message: "Order not found.",
+            data: dataResponse.data,
+          });
+          break;
+        case "INVALID_ORDER_ITEMS":
+          res.status(400).send({
+            status: false,
+            message: "Order items are not in a valid format.",
+            data: dataResponse.data,
+          });
+          break;
+        case "INVALID_ORDER_STATUS":
+          res.status(400).send({
+            status: false,
+            message: "Order is not in a valid state to execute.",
+            data: dataResponse.data,
+          });
+          break;
+        case "MISSING_REWARD_ID":
+          res.status(400).send({
+            status: false,
+            message: "Reward ID is missing for an item in the order.",
+            data: dataResponse.data,
+          });
+          break;
+        case "REWARD_NOT_FOUND":
+          res.status(404).send({
+            status: false,
+            message: `Reward not found for ID: ${dataResponse.data}.`,
+            data: dataResponse.data,
+          });
+          break;
+        case "INSUFFICIENT_REWARD_QUANTITY":
+          res.status(400).send({
+            status: false,
+            message: `Insufficient quantity for reward ID: ${dataResponse.data.rewardId}. Available: ${dataResponse.data.available}, Requested: ${dataResponse.data.requested}.`,
+            data: dataResponse.data,
+          });
+          break;
+        case "TRANSACTION_ERROR":
+          res.status(500).send({
+            status: false,
+            message: "Transaction error occurred.",
+            details: dataResponse.message,
+          });
+          break;
+        default:
+          res.status(500).send({
+            status: false,
+            message: "An unknown error occurred.",
+            data: dataResponse.data,
+          });
+      }
+    } else {
+      // Success response
+      console.log("Order executed successfully!");
+      res.status(200).send({
+        status: true,
+        message: "Order executed successfully.",
+        data: dataResponse.data,
+      });
+    }
   } catch (error) {
-    console.error("Error updating reward data:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    console.error("Error updating order:", error);
+    res.status(500).send({
+      status: false,
+      message: "Internal server error.",
+    });
   }
 });
 
@@ -455,11 +533,30 @@ bot.on("text", (ctx, next) => {
   next();
 });
 
-bot.on("message", (ctx) => {
-  if (ctx.message.web_app_data) {
-    const data = JSON.parse(ctx.message.web_app_data.data);
-    console.log("Received data from WebApp:", data);
-    ctx.reply(`Data received: ${data.status} at ${data.timestamp}`);
+// bot.on("message", (ctx) => {
+//   if (ctx.message.web_app_data) {
+//     const data = JSON.parse(ctx.message.web_app_data.data);
+//     console.log("Received data from WebApp:", data);
+//     ctx.reply(`Data received: ${data.status} at ${data.timestamp}`);
+//   }
+// });
+
+bot.on("message", async (ctx) => {
+  if (ctx?.message?.web_app_data) {
+    const data = JSON.parse(ctx?.message?.web_app_data?.data);
+    // console.log('data: ' + JSON.stringify(ctx))
+    if (data.score !== undefined) {
+      // console.log("Received score from WebApp:", data);
+      const dataResponse = await getUserCoins(String(ctx?.message?.chat?.id));
+      ctx.reply(`Your score: ${data.score}. Well done ${ctx?.message?.chat?.first_name}! 🎉`);
+      // console.log('JSON.stringify(dataResponse): ' + JSON.stringify(dataResponse))
+      ctx.reply(`You gained ${dataResponse?.coin} coins!`);
+    } else {
+      console.log("Received data from WebApp:", data);
+      ctx.reply(`Data received: ${data.status} at ${data.timestamp}`);
+    }
+  } else {
+    ctx.reply("Send data through the WebApp.");
   }
 });
 

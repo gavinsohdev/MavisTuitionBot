@@ -453,69 +453,90 @@ const getAllOrdersWithUsers = async () => {
 };
 
 const updateOrder = async (orderId, admin_fullname) => {
-  console.log('orderId: ' + orderId);
   const orderRef = doc(firestoreDb, "orders", orderId);
 
   try {
-    await runTransaction(firestoreDb, async (transaction) => {
+    const result = await runTransaction(firestoreDb, async (transaction) => {
       // Fetch the order document
       const orderDoc = await transaction.get(orderRef);
 
       if (!orderDoc.exists()) {
-        throw new Error("Order not found");
+        console.error("Order not found");
+        return { success: false, errorType: "ORDER_NOT_FOUND", data: orderId };
       }
 
       const orderData = orderDoc.data();
 
-      // Check if orderData.items is an array
+      // Validate order data
       if (!Array.isArray(orderData.items)) {
-        throw new Error("Order items is not an array");
+        console.error("Order items is not an array");
+        return { success: false, errorType: "INVALID_ORDER_ITEMS", data: orderId };
       }
 
       if (orderData.status !== "Pending") {
-        throw new Error("Order is not in a valid state to execute");
+        console.error("Order is not in a valid state to execute");
+        return { success: false, errorType: "INVALID_ORDER_STATUS", data: orderId };
       }
 
-      // Loop through items in the order
+      // Prepare to collect reward updates
+      const rewardUpdates = [];
+
       for (const item of orderData.items) {
-        // Check if item.reward_id is defined and not null
+        // Validate reward item
         if (!item.id) {
-          throw new Error("Reward ID is missing for an item in the order");
+          console.error("Reward ID is missing for an item in the order");
+          return { success: false, errorType: "MISSING_REWARD_ID", data: item };
         }
 
-        const rewardRef = doc(firestoreDb, 'rewards', item.id); // Get a reference to the reward document
+        const rewardRef = doc(firestoreDb, "rewards", item.id);
 
         // Fetch the reward document
         const rewardDoc = await transaction.get(rewardRef);
         if (!rewardDoc.exists()) {
-          throw new Error(`Reward with ID ${item.id} not found`);
+          console.error(`Reward with ID ${item.id} not found`);
+          return { success: false, errorType: "REWARD_NOT_FOUND", data: item.id };
         }
 
         const rewardData = rewardDoc.data();
 
-        // Check if the reward has enough quantity
+        // Check reward quantity
         if (rewardData.quantity < item.quantity) {
-          throw new Error(`Insufficient quantity for reward: ${item.name}`);
+          console.error(`Insufficient quantity for reward: ${item.name}`);
+          return {
+            success: false,
+            errorType: "INSUFFICIENT_REWARD_QUANTITY",
+            data: { rewardId: item.id, available: rewardData.quantity, requested: item.quantity },
+          };
         }
 
-        // Deduct the quantity from the reward document
-        transaction.update(rewardRef, {
-          quantity: rewardData.quantity - item.quantity,
+        // Prepare update for reward
+        rewardUpdates.push({
+          rewardRef,
+          newQuantity: rewardData.quantity - item.quantity,
         });
       }
 
-      // Update the order status to "Completed"
+      // Perform all reward updates
+      for (const { rewardRef, newQuantity } of rewardUpdates) {
+        transaction.update(rewardRef, { quantity: newQuantity });
+      }
+
+      // Update order status
       transaction.update(orderRef, {
         status: "Completed",
-        date_completed: { date: new Date().toISOString(), completed_by: admin_fullname }
+        date_completed: {
+          date: new Date().toISOString(),
+          completed_by: admin_fullname,
+        },
       });
-      
-      return true;
+
+      return { success: true, data: { orderId, updatedBy: admin_fullname } };
     });
 
-    console.log("Order executed successfully!");
+    return result; // Return result of the transaction
   } catch (error) {
     console.error("Error executing order:", error.message);
+    return { success: false, errorType: "TRANSACTION_ERROR", message: error.message };
   }
 };
 
