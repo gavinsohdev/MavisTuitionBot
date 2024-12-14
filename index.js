@@ -1,6 +1,11 @@
 require("dotenv").config();
+const jwtSecret = process.env.JWT_SECRET || "default_secret_key";
+const jwtExpiration = process.env.JWT_EXPIRATION || "30m";
+const jwt = require("jsonwebtoken");
 const express = require("express");
 const { Telegraf, Markup, session } = require("telegraf");
+const { rateLimit } = require("express-rate-limit");
+const { slowDown } = require("express-slow-down");
 const {
   initializeFirebaseApp,
   registerUser,
@@ -19,16 +24,37 @@ const {
   placeOrder,
   updateOrder,
   getAllOrders,
-  getAllOrdersWithUsers
+  getAllOrdersWithUsers,
+  cancelOrderTransaction,
+  approveUser,
 } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
 
+const limiterRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  limit: 1000, // each IP can make up to 100 requests per `windowsMs` (5 minutes)
+  standardHeaders: true, // add the `RateLimit-*` headers to the response
+  legacyHeaders: false, // remove the `X-RateLimit-*` headers from the response
+});
+
+const limiterSlowDown = slowDown({
+  windowMs: 15 * 60 * 1000, // 5 minutes
+  delayAfter: 100, // allow 10 requests per `windowMs` (5 minutes) without slowing them down
+  delayMs: (hits) => hits * 200, // add 200 ms of delay to every request after the 10th
+  maxDelayMs: 5000, // max global delay of 5 seconds
+});
+
 const app = express();
 const bot = new Telegraf(token);
 
 app.use(express.json());
+
+app.use(limiterRateLimit);
+app.use(limiterSlowDown);
+app.set("trust proxy", true);
+
 initializeFirebaseApp();
 
 app.post("/test", async (req, res) => {
@@ -57,42 +83,97 @@ app.post("/test", async (req, res) => {
 //   }
 // });
 
+const verifyToken = (req, res, next) => {
+  const token = req.headers["authorization"]?.split(" ")[1]; // Expecting "Bearer <token>"
+
+  if (!token) {
+    console.error("Token is required");
+    return res
+      .status(403)
+      .send({ status: false, message: "Token is required." });
+  }
+
+  jwt.verify(token, jwtSecret, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ status: false, message: "Invalid token." });
+    }
+
+    req.user = decoded; // Add decoded user data to request object
+    next(); // Proceed to the next middleware
+  });
+};
+
 app.post("/register-user", async (req, res) => {
   const data = req.body;
   try {
     await registerUser(data);
-    if (data.role == 'Student') {
+    if (data.role == "Student") {
       await registerUserCoin(data);
     }
-    res.status(200).send({ status: true });  
+
+    // Generate a JWT token
+    const token = jwt.sign({ id: data.id, role: data.role }, jwtSecret, {
+      expiresIn: jwtExpiration,
+    });
+
+    res.status(200).send({ status: true, token });
   } catch (error) {
     console.error("Error registering user data:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/update-user", async (req, res) => {
+app.post("/update-user", verifyToken, async (req, res) => {
   const data = req.body;
   try {
     await updateUser(data);
-    res.status(200).send({ status: true });    
+    res.status(200).send({ status: true });
   } catch (error) {
     console.error("Error updating user data:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/get-user", async (req, res) => {
+app.post("/initialize-app", async (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(400).send({ status: false, message: "ID is required." });
+  }
+  try {
+    const user = await getUser(id);
+
+    if (user) {
+      // Generate token for the existing user
+      const token = jwt.sign({ id: user.id, role: user.role }, jwtSecret, {
+        expiresIn: jwtExpiration,
+      });
+      return res.status(200).send({ status: true, dataObj: user, token });
+    }
+
+    res
+      .status(404)
+      .send({ status: false, message: "No user found with the id" });
+  } catch (error) {
+    console.error("Error initializing app:", error);
+    res.status(500).send({ status: false, message: "Internal server error." });
+  }
+});
+
+app.post("/get-user", verifyToken, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) {
-      return res.status(400).send({ status: false, message: "ID is required." });
+      return res
+        .status(400)
+        .send({ status: false, message: "ID is required." });
     }
     const user = await getUser(id);
     if (user) {
       return res.status(200).send({ status: true, dataObj: user });
-    } 
-    res.status(200).send({ status: false, message: "No user found with the id" });
+    }
+    res
+      .status(200)
+      .send({ status: false, message: "No user found with the id" });
   } catch (error) {
     console.error("Error fetching user data:", error);
     res.status(500).send({ status: false, message: "Internal server error." });
@@ -113,7 +194,7 @@ app.post("/get-user", async (req, res) => {
 //   }
 // });
 
-app.post("/get-coins", async (req, res) => {
+app.post("/get-coins", verifyToken, async (req, res) => {
   const { id } = req.body;
   try {
     const dataResponse = await getUserCoins(id);
@@ -123,17 +204,17 @@ app.post("/get-coins", async (req, res) => {
   }
 });
 
-app.post("/update-coins", async (req, res) => {
+app.post("/update-coins", verifyToken, async (req, res) => {
   const { id, coinAmount } = req.body;
   try {
     const dataResponse = await updateUserCoins(id, coinAmount);
-    res.status(200).send({ status: true, coin: coinAmount });    
+    res.status(200).send({ status: true, coin: coinAmount });
   } catch (error) {
     res.status(500).send({ status: false, error: "Internal Server Error." });
-  } 
+  }
 });
 
-app.post("/get-all-rewards", async (req, res) => {
+app.post("/get-all-rewards", verifyToken, async (req, res) => {
   try {
     const dataResponse = await getAllRewards();
     res.status(200).send({ status: true, dataObj: dataResponse });
@@ -142,40 +223,40 @@ app.post("/get-all-rewards", async (req, res) => {
   }
 });
 
-app.post("/upload-reward", async (req, res) => {
+app.post("/upload-reward", verifyToken, async (req, res) => {
   const { payload: data } = req.body;
   try {
     const dataResponse = await uploadReward(data);
     res.status(200).send({ status: true });
   } catch (error) {
     console.error("Error uploading reward:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/update-reward", async (req, res) => {
+app.post("/update-reward", verifyToken, async (req, res) => {
   const data = req.body;
   try {
     const dataResponse = await updateReward(data?.payload);
-    res.status(200).send({ status: true });    
+    res.status(200).send({ status: true });
   } catch (error) {
     console.error("Error updating reward data:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/delete-reward", async (req, res) => {
+app.post("/delete-reward", verifyToken, async (req, res) => {
   const { id } = req.body;
   try {
     const dataResponse = await deleteReward(id);
-    res.status(200).send({ status: true });    
+    res.status(200).send({ status: true });
   } catch (error) {
     console.error("Error deleting reward data:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/get-all-cart", async (req, res) => {
+app.post("/get-all-cart", verifyToken, async (req, res) => {
   const { id } = req.body;
   try {
     const dataResponse = await getAllCart(id);
@@ -185,29 +266,29 @@ app.post("/get-all-cart", async (req, res) => {
   }
 });
 
-app.post("/add-to-cart", async (req, res) => {
-  const { id = '', reward = {} } = req.body;
+app.post("/add-to-cart", verifyToken, async (req, res) => {
+  const { id = "", reward = {} } = req.body;
   try {
     const dataResponse = await addToCart(id, reward);
-    res.status(200).send({ status: true });    
+    res.status(200).send({ status: true });
   } catch (error) {
     console.error("Error adding to cart:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/delete-from-cart", async (req, res) => {
-  const { id = '', itemId = '' } = req.body;
+app.post("/delete-from-cart", verifyToken, async (req, res) => {
+  const { id = "", itemId = "" } = req.body;
   try {
     const dataResponse = await deleteFromCart(id, itemId);
-    res.status(200).send({ status: true });    
+    res.status(200).send({ status: true });
   } catch (error) {
     console.error("Error adding to cart:", error);
-    res.status(500).send({ status: false, message: "Internal server error." });    
+    res.status(500).send({ status: false, message: "Internal server error." });
   }
 });
 
-app.post("/place-order", async (req, res) => {
+app.post("/place-order", verifyToken, async (req, res) => {
   const data = req.body;
   try {
     const dataResponse = await placeOrder(data?.id);
@@ -231,7 +312,7 @@ app.post("/place-order", async (req, res) => {
   }
 });
 
-app.post("/get-all-orders", async (req, res) => {
+app.post("/get-all-orders", verifyToken, async (req, res) => {
   const { id } = req.body;
   try {
     const dataResponse = await getAllOrders(id);
@@ -241,16 +322,26 @@ app.post("/get-all-orders", async (req, res) => {
   }
 });
 
-app.get("/get-all-orders-with-users", async (req, res) => {
+// app.get("/get-all-orders-with-users", verifyToken, async (req, res) => {
+//   try {
+//     const dataResponse = await getAllOrdersWithUsers();
+//     res.status(200).send({ status: true, dataObj: dataResponse });
+//   } catch (error) {
+//     res.status(500).send({ error: "Internal Server Error." });
+//   }
+// });
+
+app.get("/get-all-orders-with-users", verifyToken, async (req, res) => {
+  const { limit = 10, startAfterDocId = null } = req.query;
   try {
-    const dataResponse = await getAllOrdersWithUsers();
+    const dataResponse = await getAllOrdersWithUsers(Number(limit), startAfterDocId);
     res.status(200).send({ status: true, dataObj: dataResponse });
   } catch (error) {
     res.status(500).send({ error: "Internal Server Error." });
   }
 });
 
-app.post("/update-order", async (req, res) => {
+app.post("/update-order", verifyToken, async (req, res) => {
   const {
     orderId,
     adminData: { first_name, last_name },
@@ -338,6 +429,62 @@ app.post("/update-order", async (req, res) => {
       status: false,
       message: "Internal server error.",
     });
+  }
+});
+
+app.post("/cancel-order", verifyToken, async (req, res) => {
+  const { orderId, totalPrice } = req.body;
+
+  try {
+    const dataResponse = await cancelOrderTransaction(orderId, totalPrice);
+
+    if (!dataResponse.success) {
+      res.status(400).send({
+        status: false,
+        message: dataResponse.message || "Failed to cancel the order.",
+        data: dataResponse.data,
+      });
+    } else {
+      res.status(200).send({
+        status: true,
+        message: "Order successfully canceled.",
+        data: dataResponse.data,
+      });
+    }
+  } catch (error) {
+    console.error("Error canceling order:", error);
+    res.status(500).send({
+      status: false,
+      message: "Internal server error.",
+    });
+  }
+});
+
+app.post("/approve-user", verifyToken, async (req, res) => {
+  const { userId } = req.body; // Extract userId from the request body
+  try {
+    const approvalResponse = await approveUser(userId);
+
+    if (approvalResponse === "Student") {
+      res
+        .status(200)
+        .send({ status: false, message: "User is a student." });
+    } else if (approvalResponse === "AlreadyApproved") {
+      res
+        .status(200)
+        .send({ status: false, message: "User is already approved." });
+    } else if (approvalResponse) {
+      res
+        .status(200)
+        .send({ status: true, message: "User approved successfully." });
+    } else {
+      res
+        .status(404)
+        .send({ status: false, message: "User not found or approval failed." });
+    }
+  } catch (error) {
+    console.error("Error approving user:", error);
+    res.status(500).send({ error: "Internal Server Error." });
   }
 });
 
@@ -548,7 +695,9 @@ bot.on("message", async (ctx) => {
     if (data.score !== undefined) {
       // console.log("Received score from WebApp:", data);
       const dataResponse = await getUserCoins(String(ctx?.message?.chat?.id));
-      ctx.reply(`Your score: ${data.score}. Well done ${ctx?.message?.chat?.first_name}! 🎉`);
+      ctx.reply(
+        `Your score: ${data.score}. Well done ${ctx?.message?.chat?.first_name}! 🎉`
+      );
       // console.log('JSON.stringify(dataResponse): ' + JSON.stringify(dataResponse))
       ctx.reply(`You gained ${dataResponse?.coin} coins!`);
     } else {

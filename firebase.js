@@ -10,7 +10,10 @@ const {
   getDocs,
   deleteDoc,
   query,
-  where
+  where,
+  orderBy,
+  limit,
+  startAfter
 } = require("firebase/firestore");
 
 const {
@@ -92,7 +95,11 @@ const updateUser = async ({ data, id }) => {
 };
 
 const registerUserCoin = async (data) => {
-  const dataToUpload = { coin: 0, id: String(data?.id), last_updated: new Date().toISOString() };
+  const dataToUpload = {
+    coin: 0,
+    id: String(data?.id),
+    last_updated: new Date().toISOString(),
+  };
   try {
     const document = doc(firestoreDb, "user_coins", String(data?.id));
     let dataUpdated = await setDoc(document, dataToUpload);
@@ -179,13 +186,13 @@ const getAllRewards = async () => {
   try {
     // Reference the "rewards" collection
     const rewardsCollection = collection(firestoreDb, "rewards");
-    
+
     // Fetch all documents in the "rewards" collection
     const snapshot = await getDocs(rewardsCollection);
-    
+
     // Map through the documents and extract their data
-    const rewards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
+    const rewards = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
     return rewards;
   } catch (error) {
     console.error("Error retrieving rewards:", error);
@@ -248,29 +255,27 @@ const addToCart = async (userId, reward) => {
 
   if (cartDoc.exists()) {
     const cartData = cartDoc.data();
-    const existingItemIndex = cartData.items.findIndex(item => item.id === reward.id);
+    const existingItemIndex = cartData.items.findIndex(
+      (item) => item.id === reward.id
+    );
     if (existingItemIndex >= 0) {
       cartData.items[existingItemIndex].quantity += 1;
     } else {
       cartData.items.push({ ...reward, quantity: 1 });
     }
-    cartData.total_price = cartData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    await setDoc(
-      documentRef,
-      cartData,
-      { merge: true }
+    cartData.total_price = cartData.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
     );
+    await setDoc(documentRef, cartData, { merge: true });
   } else {
     const newCart = {
       id: userId,
       items: [{ ...reward, quantity: 1 }],
       total_price: reward.price,
-      last_updated: new Date().toISOString()
+      last_updated: new Date().toISOString(),
     };
-    await setDoc(
-      documentRef,
-      newCart
-    );
+    await setDoc(documentRef, newCart);
   }
 };
 
@@ -280,11 +285,11 @@ const deleteFromCart = async (userId, itemId) => {
 
   if (cartDoc.exists()) {
     const cartData = cartDoc.data();
-    const itemIndex = cartData.items.findIndex(item => item.id === itemId);
+    const itemIndex = cartData.items.findIndex((item) => item.id === itemId);
 
     if (itemIndex >= 0) {
       const item = cartData.items[itemIndex];
-      
+
       // Decrease quantity or remove item
       if (item.quantity > 1) {
         cartData.items[itemIndex].quantity -= 1;
@@ -389,7 +394,7 @@ const placeOrder = async (userId) => {
         total_price: cartData.total_price,
         status: "Pending",
         date_ordered: new Date().toISOString(),
-        date_completed: { date: null, completed_by: null }
+        date_completed: { date: null, completed_by: null },
       });
 
       // Clear the user's cart
@@ -406,49 +411,111 @@ const placeOrder = async (userId) => {
   }
 };
 
-const getAllOrdersWithUsers = async () => {
-  try {
-    const ordersCollectionRef = collection(firestoreDb, "orders"); // Reference to orders collection
-    const ordersQuerySnapshot = await getDocs(ordersCollectionRef);
+// const getAllOrdersWithUsers = async () => {
+//   try {
+//     const ordersCollectionRef = collection(firestoreDb, "orders"); // Reference to orders collection
+//     const ordersQuerySnapshot = await getDocs(ordersCollectionRef);
 
+//     const ordersWithUsers = [];
+
+//     for (const orderDoc of ordersQuerySnapshot.docs) {
+//       const orderData = orderDoc.data();
+//       const orderId = orderDoc.id; // Retrieve the document ID of the order
+//       const userId = orderData.user_id;
+
+//       if (userId) {
+//         const userDocRef = doc(firestoreDb, "users", userId); // Reference to user document
+//         const userDoc = await getDoc(userDocRef);
+
+//         if (userDoc.exists()) {
+//           const userData = userDoc.data();
+//           // Combine the order data, document ID, and user data
+//           ordersWithUsers.push({
+//             order: { ...orderData, id: orderId }, // Include document ID in the order object
+//             user: userData,
+//           });
+//         } else {
+//           console.error(`User not found for userId: ${userId}`);
+//           ordersWithUsers.push({
+//             order: { ...orderData, id: orderId }, // Include document ID even if user is missing
+//             user: null, // Indicate user details were not found
+//           });
+//         }
+//       } else {
+//         console.error("Order does not have a userId.");
+//         ordersWithUsers.push({
+//           order: { ...orderData, id: orderId }, // Include document ID
+//           user: null,
+//         });
+//       }
+//     }
+
+//     return ordersWithUsers; // Return the combined data
+//   } catch (error) {
+//     console.error("Error retrieving orders with user details:", error);
+//     throw error; // Re-throw the error for upstream handling
+//   }
+// };
+
+const getAllOrdersWithUsers = async (limitValue = 10, startAfterDocId = null) => {
+  try {
+    const ordersCollectionRef = collection(firestoreDb, "orders");
+
+    // Build the initial query
+    let queryRef = query(
+      ordersCollectionRef,
+      orderBy("date_ordered", "desc"),
+      limit(limitValue)
+    );
+
+    // If a startAfterDocId is provided, fetch the document to use as a reference
+    if (startAfterDocId) {
+      const startAfterDoc = await getDoc(doc(firestoreDb, "orders", startAfterDocId));
+      if (startAfterDoc.exists()) {
+        queryRef = query(
+          ordersCollectionRef,
+          orderBy("date_ordered", "desc"),
+          startAfter(startAfterDoc), // Use startAfter to paginate
+          limit(limitValue)
+        );
+      }
+    }
+
+    const ordersQuerySnapshot = await getDocs(queryRef);
     const ordersWithUsers = [];
 
     for (const orderDoc of ordersQuerySnapshot.docs) {
       const orderData = orderDoc.data();
-      const orderId = orderDoc.id; // Retrieve the document ID of the order
+      const orderId = orderDoc.id;
       const userId = orderData.user_id;
 
       if (userId) {
-        const userDocRef = doc(firestoreDb, "users", userId); // Reference to user document
+        const userDocRef = doc(firestoreDb, "users", userId);
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          // Combine the order data, document ID, and user data
           ordersWithUsers.push({
-            order: { ...orderData, id: orderId }, // Include document ID in the order object
+            order: { ...orderData, id: orderId },
             user: userData,
           });
         } else {
           console.error(`User not found for userId: ${userId}`);
-          ordersWithUsers.push({
-            order: { ...orderData, id: orderId }, // Include document ID even if user is missing
-            user: null, // Indicate user details were not found
-          });
+          ordersWithUsers.push({ order: { ...orderData, id: orderId }, user: null });
         }
       } else {
-        console.error("Order does not have a userId.");
-        ordersWithUsers.push({
-          order: { ...orderData, id: orderId }, // Include document ID
-          user: null,
-        });
+        ordersWithUsers.push({ order: { ...orderData, id: orderId }, user: null });
       }
     }
 
-    return ordersWithUsers; // Return the combined data
+    // Return results and the last visible document ID for pagination
+    return {
+      orders: ordersWithUsers,
+      lastVisible: ordersQuerySnapshot.docs[ordersQuerySnapshot.docs.length - 1]?.id || null,
+    };
   } catch (error) {
-    console.error("Error retrieving orders with user details:", error);
-    throw error; // Re-throw the error for upstream handling
+    console.error("Error retrieving paginated orders with users:", error);
+    throw error;
   }
 };
 
@@ -470,12 +537,20 @@ const updateOrder = async (orderId, admin_fullname) => {
       // Validate order data
       if (!Array.isArray(orderData.items)) {
         console.error("Order items is not an array");
-        return { success: false, errorType: "INVALID_ORDER_ITEMS", data: orderId };
+        return {
+          success: false,
+          errorType: "INVALID_ORDER_ITEMS",
+          data: orderId,
+        };
       }
 
       if (orderData.status !== "Pending") {
         console.error("Order is not in a valid state to execute");
-        return { success: false, errorType: "INVALID_ORDER_STATUS", data: orderId };
+        return {
+          success: false,
+          errorType: "INVALID_ORDER_STATUS",
+          data: orderId,
+        };
       }
 
       // Prepare to collect reward updates
@@ -494,7 +569,11 @@ const updateOrder = async (orderId, admin_fullname) => {
         const rewardDoc = await transaction.get(rewardRef);
         if (!rewardDoc.exists()) {
           console.error(`Reward with ID ${item.id} not found`);
-          return { success: false, errorType: "REWARD_NOT_FOUND", data: item.id };
+          return {
+            success: false,
+            errorType: "REWARD_NOT_FOUND",
+            data: item.id,
+          };
         }
 
         const rewardData = rewardDoc.data();
@@ -505,7 +584,11 @@ const updateOrder = async (orderId, admin_fullname) => {
           return {
             success: false,
             errorType: "INSUFFICIENT_REWARD_QUANTITY",
-            data: { rewardId: item.id, available: rewardData.quantity, requested: item.quantity },
+            data: {
+              rewardId: item.id,
+              available: rewardData.quantity,
+              requested: item.quantity,
+            },
           };
         }
 
@@ -536,7 +619,106 @@ const updateOrder = async (orderId, admin_fullname) => {
     return result; // Return result of the transaction
   } catch (error) {
     console.error("Error executing order:", error.message);
-    return { success: false, errorType: "TRANSACTION_ERROR", message: error.message };
+    return {
+      success: false,
+      errorType: "TRANSACTION_ERROR",
+      message: error.message,
+    };
+  }
+};
+
+const cancelOrderTransaction = async (orderId, totalPrice) => {
+  console.log('orderId: ' + orderId)
+  console.log('totalPrice: ' + totalPrice)
+  const orderRef = doc(firestoreDb, "orders", orderId);
+
+  try {
+    const result = await runTransaction(firestoreDb, async (transaction) => {
+      // Fetch the order document
+      const orderDoc = await transaction.get(orderRef);
+
+      if (!orderDoc.exists()) {
+        return { success: false, message: "Order not found." };
+      }
+
+      const orderData = orderDoc.data();
+
+      if (orderData.status !== "Pending") {
+        return {
+          success: false,
+          message: "Only pending orders can be canceled.",
+        };
+      }
+
+      // Fetch user coins document
+      const userRef = doc(firestoreDb, "user_coins", orderData.user_id);
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists()) {
+        return { success: false, message: "User coins document not found." };
+      }
+
+      const userData = userDoc.data();
+
+      // Update user coins
+      const updatedCoins = userData.coin + totalPrice;
+
+      // Perform updates
+      transaction.update(orderRef, {
+        status: "Canceled",
+        date_completed: {
+          date: null,
+          completed_by: null,
+        },
+      });
+      transaction.update(userRef, {
+        coin: updatedCoins,
+        last_updated: new Date().toISOString(),
+      });
+
+      return {
+        success: true,
+        data: { orderId, updatedCoins },
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error canceling order:", error.message);
+    return { success: false, message: "Transaction error occurred." };
+  }
+};
+
+const approveUser = async (userId) => {
+  try {
+    const userRef = doc(firestoreDb, "users", userId); // Reference to the user's document
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+
+      // Check if the user is already approved
+      if (userData.role === "Student") {
+        console.log("User is a student:", userId);
+        return "Student"; // Return a specific status for already approved users
+      }
+
+      // Check if the user is already approved
+      if (userData.registration_status === "Approved") {
+        console.log("User is already approved:", userId);
+        return "AlreadyApproved"; // Return a specific status for already approved users
+      }
+
+      // Update the registration_status to "approved"
+      await updateDoc(userRef, { registration_status: "Approved" });
+      return true; // Return true on successful approval
+    } else {
+      console.error("User not found:", userId);
+      return false; // Return false if the user does not exist
+    }
+  } catch (error) {
+    console.error("Error approving user:", error);
+    throw error; // Re-throw the error for upstream handling
   }
 };
 
@@ -561,5 +743,7 @@ module.exports = {
   placeOrder,
   updateOrder,
   getAllOrders,
-  getAllOrdersWithUsers
+  getAllOrdersWithUsers,
+  cancelOrderTransaction,
+  approveUser,
 };
