@@ -182,6 +182,24 @@ const uploadReward = async (data) => {
   }
 };
 
+const getAllBranches = async () => {
+  try {
+    // Reference the "branches" collection in Firestore
+    const branchesCollection = collection(firestoreDb, "branches");
+
+    // Fetch all documents in the "branches" collection
+    const snapshot = await getDocs(branchesCollection);
+
+    // Map through the documents and extract their data
+    const branches = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+    return branches;
+  } catch (error) {
+    console.error("Error retrieving branches:", error);
+    return [];
+  }
+};
+
 const getAllRewards = async () => {
   try {
     // Reference the "rewards" collection
@@ -359,10 +377,34 @@ const getAllOrders = async (userId) => {
   }
 };
 
+function checkBranchesInCart(cart, user) {
+  const missingBranchIds = [];
+
+  // Iterate through each item in the cart
+  cart.items.forEach(item => {
+    // For each item in the cart, check if the item's selectedBranches contains a branch in the user's selectedBranches
+    item.selectedBranches.forEach(branch => {
+      // Check if the branch exists in the user's selectedBranches array or if the branch name is "All Branches"
+      const branchExists = 
+        user.selectedBranches.some(userBranch => userBranch.id === branch.id) || 
+        branch.name === "All Branches";
+
+      // If the branch does not exist in the user's selectedBranches array, add the branch ID to the missingBranchIds array
+      if (!branchExists) {
+        missingBranchIds.push({ item: item.name, branch: branch.name });
+      }
+    });
+  });
+
+  // If there are missing branch IDs, return the array, otherwise return false
+  return missingBranchIds.length > 0 ? true : false;
+}
+
 const placeOrder = async (userId) => {
   try {
     const cartRef = doc(firestoreDb, "carts", userId);
     const userCoinsRef = doc(firestoreDb, "user_coins", userId);
+    const userRef = doc(firestoreDb, "users", userId);
     const ordersCollectionRef = collection(firestoreDb, "orders");
 
     const result = await runTransaction(firestoreDb, async (transaction) => {
@@ -370,6 +412,16 @@ const placeOrder = async (userId) => {
       const cartDoc = await transaction.get(cartRef);
       if (!cartDoc.exists()) throw new Error("Cart not found");
       const cartData = cartDoc.data();
+
+      // Fetch cart data
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists()) throw new Error("User not found");
+      const userData = userDoc.data();
+      
+      let result = checkBranchesInCart(cartData, userData)
+      if (result) {
+        return "REWARD_NOT_AVAILABLE_IN_ONE_OR_MORE_BRANCHES";
+      }
 
       // Fetch user's coin balance
       const userCoinsDoc = await transaction.get(userCoinsRef);
@@ -733,6 +785,7 @@ module.exports = {
   getUser,
   getUserCoins,
   updateUserCoins,
+  getAllBranches,
   uploadReward,
   getAllRewards,
   updateReward,

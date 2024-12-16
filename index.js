@@ -14,6 +14,7 @@ const {
   getUser,
   getUserCoins,
   updateUserCoins,
+  getAllBranches,
   uploadReward,
   getAllRewards,
   updateReward,
@@ -214,6 +215,16 @@ app.post("/update-coins", verifyToken, async (req, res) => {
   }
 });
 
+app.post("/get-all-branches", async (req, res) => {
+  try {
+    const dataResponse = await getAllBranches(); // Call the helper function
+    res.status(200).send({ status: true, dataObj: dataResponse }); // Send data back to the client
+  } catch (error) {
+    console.error("Error retrieving branches:", error);
+    res.status(500).send({ error: "Internal Server Error." });
+  }
+});
+
 app.post("/get-all-rewards", verifyToken, async (req, res) => {
   try {
     const dataResponse = await getAllRewards();
@@ -297,6 +308,11 @@ app.post("/place-order", verifyToken, async (req, res) => {
       res.status(200).send({
         status: false,
         message: "INSUFFICIENT_COINS",
+      });
+    } else if (dataResponse === "REWARD_NOT_AVAILABLE_IN_ONE_OR_MORE_BRANCHES") {
+      res.status(200).send({
+        status: false,
+        message: "REWARD_NOT_AVAILABLE_IN_ONE_OR_MORE_BRANCHES",
       });
     } else {
       // Handle successful order placement with new coin balance
