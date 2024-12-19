@@ -679,9 +679,7 @@ const updateOrder = async (orderId, admin_fullname) => {
   }
 };
 
-const cancelOrderTransaction = async (orderId, totalPrice) => {
-  console.log('orderId: ' + orderId)
-  console.log('totalPrice: ' + totalPrice)
+const cancelOrderTransaction = async (orderId, totalPrice, adminData) => {
   const orderRef = doc(firestoreDb, "orders", orderId);
 
   try {
@@ -719,8 +717,8 @@ const cancelOrderTransaction = async (orderId, totalPrice) => {
       transaction.update(orderRef, {
         status: "Canceled",
         date_completed: {
-          date: null,
-          completed_by: null,
+          date: new Date().toISOString(),
+          completed_by: `${adminData.first_name} ${adminData.last_name}`,
         },
       });
       transaction.update(userRef, {

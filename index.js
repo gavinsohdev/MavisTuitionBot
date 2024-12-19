@@ -35,14 +35,14 @@ const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
 
 const limiterRateLimit = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  limit: 1000, // each IP can make up to 100 requests per `windowsMs` (5 minutes)
+  limit: 10000, // each IP can make up to 100 requests per `windowsMs` (5 minutes)
   standardHeaders: true, // add the `RateLimit-*` headers to the response
   legacyHeaders: false, // remove the `X-RateLimit-*` headers from the response
 });
 
 const limiterSlowDown = slowDown({
   windowMs: 15 * 60 * 1000, // 5 minutes
-  delayAfter: 100, // allow 10 requests per `windowMs` (5 minutes) without slowing them down
+  delayAfter: 1000, // allow 10 requests per `windowMs` (5 minutes) without slowing them down
   delayMs: (hits) => hits * 200, // add 200 ms of delay to every request after the 10th
   maxDelayMs: 5000, // max global delay of 5 seconds
 });
@@ -449,10 +449,9 @@ app.post("/update-order", verifyToken, async (req, res) => {
 });
 
 app.post("/cancel-order", verifyToken, async (req, res) => {
-  const { orderId, totalPrice } = req.body;
-
+  const { orderId, totalPrice, adminData } = req.body;
   try {
-    const dataResponse = await cancelOrderTransaction(orderId, totalPrice);
+    const dataResponse = await cancelOrderTransaction(orderId, totalPrice, adminData);
 
     if (!dataResponse.success) {
       res.status(400).send({
@@ -463,7 +462,7 @@ app.post("/cancel-order", verifyToken, async (req, res) => {
     } else {
       res.status(200).send({
         status: true,
-        message: "Order successfully canceled.",
+        message: `Order successfully canceled. ${totalPrice} coins refunded to the user. User's new coin balance: ${dataResponse.data.updatedCoins} coins`,
         data: dataResponse.data,
       });
     }
