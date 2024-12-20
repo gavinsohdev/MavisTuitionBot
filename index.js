@@ -707,14 +707,14 @@ bot.on("message", async (ctx) => {
   if (ctx?.message?.web_app_data) {
     const data = JSON.parse(ctx?.message?.web_app_data?.data);
     // console.log('data: ' + JSON.stringify(ctx))
-    if (data.score !== undefined) {
+    if (data.message !== undefined) {
       // console.log("Received score from WebApp:", data);
       const dataResponse = await getUserCoins(String(ctx?.message?.chat?.id));
       ctx.reply(
-        `Your score: ${data.score}. Well done ${ctx?.message?.chat?.first_name}! 🎉`
+        `${data.message}. Well done ${ctx?.message?.chat?.first_name}! 🎉`
       );
       // console.log('JSON.stringify(dataResponse): ' + JSON.stringify(dataResponse))
-      ctx.reply(`You gained ${dataResponse?.coin} coins!`);
+      // ctx.reply(`You gained ${dataResponse?.coin} coins!`);
     } else {
       console.log("Received data from WebApp:", data);
       ctx.reply(`Data received: ${data.status} at ${data.timestamp}`);
