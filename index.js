@@ -711,7 +711,7 @@ bot.on("message", async (ctx) => {
       // console.log("Received score from WebApp:", data);
       const dataResponse = await getUserCoins(String(ctx?.message?.chat?.id));
       ctx.reply(
-        `${data.message}. Well done ${ctx?.message?.chat?.first_name}! 🎉`
+        `${data.message} Well done ${ctx?.message?.chat?.first_name}! 🎉`
       );
       // console.log('JSON.stringify(dataResponse): ' + JSON.stringify(dataResponse))
       // ctx.reply(`You gained ${dataResponse?.coin} coins!`);
