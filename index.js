@@ -553,7 +553,7 @@ const initialKeyboard = {
     [{ text: "Yes" }, { text: "No" }],
     [{ text: "I have a question" }],
     [
-      { text: "App", web_app: { url: homepage_url } },
+      { text: "Game", web_app: { url: homepage_url } },
       {
         text: "Schedule",
         web_app: { url: "https://www.mavistutorial.com/schedule/" },
@@ -578,7 +578,7 @@ const stage1_yes_keyboard = {
     ],
     [{ text: "I have a question" }],
     [
-      { text: "App", web_app: { url: homepage_url } },
+      { text: "Game", web_app: { url: homepage_url } },
       {
         text: "Schedule",
         web_app: { url: "https://www.mavistutorial.com/schedule/" },
@@ -603,7 +603,7 @@ const stage1_no_keyboard = {
     ],
     [{ text: "I have a question" }],
     [
-      { text: "App", web_app: { url: homepage_url } },
+      { text: "Game", web_app: { url: homepage_url } },
       {
         text: "Schedule",
         web_app: { url: "https://www.mavistutorial.com/schedule/" },
