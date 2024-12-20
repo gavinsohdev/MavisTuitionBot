@@ -31,7 +31,7 @@ const {
 } = require("./firebase");
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const homepage_url = "https://gavinsohdev.github.io/MavisReactKeyboardMiniApp/";
+const homepage_url = "https://8528-2400-d802-26b8-9200-f83a-fa2f-78e5-1a10.ngrok-free.app";
 
 const limiterRateLimit = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
