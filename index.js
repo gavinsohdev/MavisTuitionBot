@@ -658,21 +658,21 @@ bot.on("text", (ctx, next) => {
   let stage = ctx.session.stage;
   let text = ctx.message.text;
   switch (true) {
-    case text === "Hello":
+    case text.toLowerCase() === "hello":
       ctx.reply(
         "Welcome to Mavis Tutorial Centre!\n\nDo you have Mavis Online Account?\n\n(If the Yes/No buttons are not shown, try switching between a keyboard and buttons by tapping on the icon on the right of the message box)",
         { reply_markup: initialKeyboard }
       );
       ctx.session.stage = 1;
       break;
-    case stage === 1 && text === "Yes":
+    case stage === 1 && text.toLowerCase() === "yes":
       ctx.reply(
         "Nice!\n\nClick the [⭐Login to your Mavis Online Account📝] button below\n\n(If no buttons are shown, try switching between a keyboard and buttons by tapping on the icon on the right of the message box)",
         { reply_markup: stage1_yes_keyboard }
       );
       ctx.session.stage = 2;
       break;
-    case stage === 1 && text === "No":
+    case stage === 1 && text.toLowerCase() === "no":
       ctx.reply(
         "It's easy to create a Mavis Online Account!\n\nGet a free consultation when you sign up today\n\nTo create an account, click the [⭐Create a Mavis Online Account📝] button below",
         { reply_markup: stage1_no_keyboard }
@@ -687,7 +687,7 @@ bot.on("text", (ctx, next) => {
       ctx.session.stage = 2;
       break;
     default:
-      ctx.replyWithMarkdown(
+      ctx.reply(
         `Sorry, I did not understand that. Please say *Hello* to restart the conversation.`
       );
   }
@@ -695,32 +695,19 @@ bot.on("text", (ctx, next) => {
   next();
 });
 
-// bot.on("message", (ctx) => {
-//   if (ctx.message.web_app_data) {
-//     const data = JSON.parse(ctx.message.web_app_data.data);
-//     console.log("Received data from WebApp:", data);
-//     ctx.reply(`Data received: ${data.status} at ${data.timestamp}`);
-//   }
-// });
-
 bot.on("message", async (ctx) => {
   if (ctx?.message?.web_app_data) {
     const data = JSON.parse(ctx?.message?.web_app_data?.data);
-    // console.log('data: ' + JSON.stringify(ctx))
     if (data.message !== undefined) {
-      // console.log("Received score from WebApp:", data);
-      const dataResponse = await getUserCoins(String(ctx?.message?.chat?.id));
+      // const dataResponse = await getUserCoins(String(ctx?.message?.chat?.id));
       ctx.reply(
         `${data.message} Well done ${ctx?.message?.chat?.first_name}! 🎉`
       );
-      // console.log('JSON.stringify(dataResponse): ' + JSON.stringify(dataResponse))
       // ctx.reply(`You gained ${dataResponse?.coin} coins!`);
     } else {
       console.log("Received data from WebApp:", data);
       ctx.reply(`Data received: ${data.status} at ${data.timestamp}`);
     }
-  } else {
-    ctx.reply("Send data through the WebApp.");
   }
 });
 
@@ -740,7 +727,6 @@ bot.action("question_3", (ctx) => {
 });
 
 bot.launch();
-// bot.startWebhook();
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
